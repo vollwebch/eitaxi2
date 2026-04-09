@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   description: "La plataforma líder de taxis en Suiza. Encuentra taxistas verificados, reserva traslados al aeropuerto, viajes de larga distancia y más. Conecta directamente con conductores profesionales.",
   keywords: ["taxi", "Suiza", "Zürich", "Ginebra", "Bern", "traslado", "aeropuerto", "taxista"],
   authors: [{ name: "eitaxi" }],
-  manifest: "/manifest.json",
   themeColor: "#facc15",
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚕</text></svg>",
@@ -56,6 +55,19 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // Dynamic manifest based on URL
+              (function() {
+                var path = window.location.pathname;
+                var manifestUrl = '/manifest-client.json';
+                if (path.startsWith('/widget') || path.startsWith('/gps-quick')) {
+                  manifestUrl = '/manifest.json';
+                }
+                var link = document.createElement('link');
+                link.rel = 'manifest';
+                link.href = manifestUrl;
+                document.head.appendChild(link);
+              })();
+
               // Register Service Worker
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {

@@ -36,6 +36,8 @@ import {
   Clock3,
   Banknote,
   Radio,
+  Download,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1438,6 +1440,96 @@ function MobileMenu({
 }
 
 // ============================================
+// CLIENT INSTALL BUTTON
+// ============================================
+function ClientInstallButton() {
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [deviceType, setDeviceType] = useState<'ios' | 'android' | 'desktop'>('desktop');
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches
+      || (window.navigator as any).standalone === true;
+    setIsStandalone(standalone);
+
+    const ua = navigator.userAgent;
+    if (/iPad|iPhone|iPod/.test(ua)) setDeviceType('ios');
+    else if (/Android/.test(ua)) setDeviceType('android');
+    else setDeviceType('desktop');
+  }, []);
+
+  if (isStandalone) return null;
+
+  const handleInstallClick = async () => {
+    // Try native install prompt (Android/Chrome)
+    const deferredPrompt = (window as any).deferredInstallPrompt;
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') return;
+    }
+    setShowInstructions(true);
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleInstallClick}
+        className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium flex items-center gap-1"
+      >
+        <Download className="h-4 w-4" />
+        Descargar app
+      </button>
+
+      {showInstructions && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowInstructions(false)}>
+          <div className="bg-card border border-border rounded-2xl p-6 mx-4 max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Smartphone className="h-5 w-5 text-yellow-400" />
+                Instalar eitaxi
+              </h3>
+              <button onClick={() => setShowInstructions(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Ten eitaxi en tu móvil como una app. Busca taxis al instante desde tu pantalla de inicio.
+            </p>
+            {deviceType === 'ios' && (
+              <div className="space-y-2 text-sm">
+                <p className="flex items-start gap-2"><span className="font-bold text-blue-400">1.</span> Toca el botón <strong>Compartir</strong> (cuadrado con flecha ↑ abajo a la izquierda)</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-green-400">2.</span> Desliza y toca <strong>"Añadir a pantalla de inicio"</strong></p>
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">3.</span> Toca <strong>"Añadir"</strong> — ¡listo!</p>
+              </div>
+            )}
+            {deviceType === 'android' && (
+              <div className="space-y-2 text-sm">
+                <p className="flex items-start gap-2"><span className="font-bold text-gray-400">1.</span> Toca el <strong>menú ⋮</strong> arriba a la derecha</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-green-400">2.</span> Toca <strong>"Añadir a pantalla de inicio"</strong></p>
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">3.</span> Confirma tocando <strong>"Añadir"</strong></p>
+              </div>
+            )}
+            {deviceType === 'desktop' && (
+              <div className="space-y-2 text-sm">
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">1.</span> Busca el icono de <strong>instalar</strong> en la barra de direcciones</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">2.</span> O usa el <strong>menú ⋮ → Instalar app</strong></p>
+              </div>
+            )}
+            <button
+              onClick={() => setShowInstructions(false)}
+              className="w-full mt-4 py-2.5 rounded-xl bg-yellow-400 text-black font-bold text-sm"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================
 // FOOTER
 // ============================================
 function Footer() {
@@ -1455,14 +1547,16 @@ function Footer() {
             </span>
           </Link>
           
-          {/* Enlaces legales */}
+          {/* Enlaces legales + App */}
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+            <ClientInstallButton />
+            <span className="text-muted-foreground/50">•</span>
             <Link href="/privacidad" className="text-muted-foreground hover:text-foreground transition-colors">
-              Política de Privacidad
+              Privacidad
             </Link>
             <span className="text-muted-foreground/50">•</span>
             <Link href="/terminos" className="text-muted-foreground hover:text-foreground transition-colors">
-              Términos de Servicio
+              Términos
             </Link>
             <span className="text-muted-foreground/50">•</span>
             <Link href="/registrarse" className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium">

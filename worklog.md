@@ -730,3 +730,23 @@ const CONFIG = {
 - TypeScript strict mode compliant
 - No lint errors
 - No TypeScript errors
+
+---
+Task ID: 1
+Agent: main
+Task: Separar PWA install para clientes (home) y taxistas (widget)
+
+Work Log:
+- Creado `/public/manifest-client.json` con start_url: "/" para clientes
+- Mantenido `/public/manifest.json` con start_url: "/widget" para taxistas
+- Eliminado manifest estático de layout metadata
+- Añadido script dinámico en layout que selecciona manifest según URL
+- Modificado `PWAInstallPrompt` para no mostrar en /widget, /gps-quick, /dashboard, /login, /registrarse
+- Cambiado texto de PWAInstallPrompt de "Acceso rápido al GPS" a "Ten eitaxi en tu móvil" / "Instala la app para buscar taxis rápido"
+- Añadido componente `ClientInstallButton` en footer de home page con modal de instrucciones iOS/Android/Desktop
+- Verificado build exitoso
+
+Stage Summary:
+- Clients on home page (/): see PWA install banner + "Descargar app" in footer → installs app opening at /
+- Drivers on /widget: have their own install button → installs GPS widget opening at /widget
+- Dynamic manifest prevents wrong start_url for each audience

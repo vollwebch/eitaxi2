@@ -22,6 +22,12 @@ export default function PWAInstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    // Don't show on widget/gps-quick pages (they have their own install UI)
+    const path = window.location.pathname;
+    if (path.startsWith('/widget') || path.startsWith('/gps-quick') || path.startsWith('/dashboard') || path.startsWith('/login') || path.startsWith('/registrarse')) {
+      return;
+    }
+
     // Check if already installed
     const standalone = window.matchMedia('(display-mode: standalone)').matches
       || (window.navigator as any).standalone === true;
@@ -54,7 +60,7 @@ export default function PWAInstallPrompt() {
       if (!wasDismissed) {
         setShowPrompt(true);
       }
-    }, 2000);
+    }, 3000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
@@ -103,9 +109,9 @@ export default function PWAInstallPrompt() {
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-lg text-foreground">Instalar eitaxi</h3>
+                    <h3 className="font-bold text-lg text-foreground">Ten eitaxi en tu móvil</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Acceso rápido al GPS desde tu pantalla de inicio
+                      Instala la app para buscar taxis rápido desde tu pantalla de inicio
                     </p>
                     
                     <div className="flex gap-2 mt-3">
