@@ -442,7 +442,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     }
 
-    await setCache(cacheKey, response, 30 * 1000)
+    await setCache(cacheKey, response, 10 * 1000)
     return NextResponse.json(response)
 
   } catch (error) {

@@ -224,7 +224,7 @@ export default function LiveTaxiMap({
   // Poll for updates
   useEffect(() => {
     fetchTaxis();
-    const interval = setInterval(fetchTaxis, 30000);
+    const interval = setInterval(fetchTaxis, 15000);
     return () => clearInterval(interval);
   }, [fetchTaxis]);
 
