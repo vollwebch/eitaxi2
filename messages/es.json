@@ -1,0 +1,108 @@
+{
+  "common": {
+    "appName": "TaxiZone",
+    "tagline": "Tu taxi en Suiza a un clic de distancia",
+    "loading": "Cargando...",
+    "search": "Buscar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar",
+    "back": "Volver",
+    "seeAll": "Ver todos",
+    "verified": "Verificado",
+    "top": "Top",
+    "available24h": "24/7"
+  },
+  "header": {
+    "cantons": "Cantones",
+    "login": "Acceder",
+    "register": "Ser conductor",
+    "drivers": "Conductores"
+  },
+  "hero": {
+    "badge": "Conecta con conductores verificados en segundos",
+    "title": "Tu taxi en {country}",
+    "titleHighlight": "Suiza",
+    "subtitle": "¿Dónde estás y a dónde quieres ir? Encuentra taxistas profesionales para tu viaje.",
+    "originPlaceholder": "¿Desde dónde quieres salir?",
+    "destinationPlaceholder": "¿A dónde quieres ir?",
+    "searchButton": "Buscar taxis disponibles",
+    "fromAirport": "Desde aeropuerto",
+    "toAirport": "Al aeropuerto",
+    "liechtenstein": "Liechtenstein"
+  },
+  "stats": {
+    "drivers": "Conductores",
+    "availability": "Disponibilidad",
+    "verified": "Verificados"
+  },
+  "route": {
+    "calculating": "Calculando ruta...",
+    "kmEstimated": "km estimados",
+    "minApprox": "min aprox",
+    "chfEstimated": "CHF estimado",
+    "priceNote": "* Precio estimado. El conductor confirmará el precio final."
+  },
+  "drivers": {
+    "title": "Conductores disponibles",
+    "titleRoute": "Taxis: {from} → {to}",
+    "titleLocation": "Taxis en {location}",
+    "found": "conductores encontrados",
+    "tripOf": "Viaje de {km} km",
+    "tripDistance": "Distancia viaje:",
+    "estimatedPrice": "Precio estimado:",
+    "call": "Llamar",
+    "whatsapp": "WhatsApp",
+    "noDrivers": "No se encontraron conductores",
+    "noDriversRoute": "No hay taxis disponibles para esta ruta",
+    "tryAnother": "Prueba con otra ubicación o busca en una ciudad cercana más grande",
+    "viewAll": "Ver todos los taxis disponibles",
+    "yearsExperience": "años"
+  },
+  "services": {
+    "airport": "Aeropuerto",
+    "city": "Ciudad",
+    "long_distance": "Larga distancia",
+    "limousine": "Limusina",
+    "corporate": "Corporativo",
+    "events": "Eventos"
+  },
+  "vehicleTypes": {
+    "taxi": "Taxi",
+    "limousine": "Limusina",
+    "van": "Van",
+    "premium": "Premium"
+  },
+  "locationTypes": {
+    "airport": "Aeropuerto",
+    "train_station": "Estación de tren",
+    "bus_station": "Estación de bus",
+    "hotel": "Hotel",
+    "hospital": "Hospital",
+    "university": "Universidad",
+    "city": "Ciudad",
+    "town": "Pueblo",
+    "village": "Aldea",
+    "address": "Dirección"
+  },
+  "search": {
+    "placeholder": "Buscar...",
+    "noResults": "No se encontraron ubicaciones",
+    "minChars": "Escribe al menos 2 caracteres para buscar",
+    "houseNumberHint": "Para una llegada exacta, indica el número de portal.",
+    "expanded": "Búsqueda expandida: también se buscó como",
+    "switzerland": "Suiza",
+    "liechtenstein": "Liechtenstein"
+  },
+  "cta": {
+    "title": "¿Eres conductor en Suiza?",
+    "subtitle": "Únete a nuestra plataforma y conecta con miles de pasajeros. Crea tu perfil profesional gratis.",
+    "button": "Crear mi perfil gratis"
+  },
+  "footer": {
+    "copyright": "© {year} TaxiZone. Todos los derechos reservados.",
+    "attribution": "Datos de direcciones de © OpenStreetMap"
+  }
+}

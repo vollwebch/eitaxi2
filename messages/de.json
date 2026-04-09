@@ -1,0 +1,108 @@
+{
+  "common": {
+    "appName": "TaxiZone",
+    "tagline": "Dein Taxi in der Schweiz nur einen Klick entfernt",
+    "loading": "Laden...",
+    "search": "Suchen",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "close": "Schliessen",
+    "back": "Zurück",
+    "seeAll": "Alle anzeigen",
+    "verified": "Verifiziert",
+    "top": "Top",
+    "available24h": "24/7"
+  },
+  "header": {
+    "cantons": "Kantone",
+    "login": "Anmelden",
+    "register": "Fahrer werden",
+    "drivers": "Fahrer"
+  },
+  "hero": {
+    "badge": "Verbinden Sie sich in Sekunden mit verifizierten Fahrern",
+    "title": "Dein Taxi in {country}",
+    "titleHighlight": "der Schweiz",
+    "subtitle": "Wo bist du und wohin willst du? Finde professionelle Taxifahrer für deine Fahrt.",
+    "originPlaceholder": "Von wo möchtest du abfahren?",
+    "destinationPlaceholder": "Wohin möchtest du fahren?",
+    "searchButton": "Verfügbare Taxis suchen",
+    "fromAirport": "Vom Flughafen",
+    "toAirport": "Zum Flughafen",
+    "liechtenstein": "Liechtenstein"
+  },
+  "stats": {
+    "drivers": "Fahrer",
+    "availability": "Verfügbarkeit",
+    "verified": "Verifiziert"
+  },
+  "route": {
+    "calculating": "Route wird berechnet...",
+    "kmEstimated": "km geschätzt",
+    "minApprox": "Min ca.",
+    "chfEstimated": "CHF geschätzt",
+    "priceNote": "* Geschätzter Preis. Der Fahrer bestätigt den Endpreis."
+  },
+  "drivers": {
+    "title": "Verfügbare Fahrer",
+    "titleRoute": "Taxis: {from} → {to}",
+    "titleLocation": "Taxis in {location}",
+    "found": "Fahrer gefunden",
+    "tripOf": "Fahrt von {km} km",
+    "tripDistance": "Fahrtdistanz:",
+    "estimatedPrice": "Geschätzter Preis:",
+    "call": "Anrufen",
+    "whatsapp": "WhatsApp",
+    "noDrivers": "Keine Fahrer gefunden",
+    "noDriversRoute": "Keine Taxis für diese Route verfügbar",
+    "tryAnother": "Versuche einen anderen Standort oder suche in einer grösseren Stadt in der Nähe",
+    "viewAll": "Alle verfügbaren Taxis anzeigen",
+    "yearsExperience": "Jahre"
+  },
+  "services": {
+    "airport": "Flughafen",
+    "city": "Stadt",
+    "long_distance": "Fernfahrt",
+    "limousine": "Limousine",
+    "corporate": "Firmen",
+    "events": "Events"
+  },
+  "vehicleTypes": {
+    "taxi": "Taxi",
+    "limousine": "Limousine",
+    "van": "Van",
+    "premium": "Premium"
+  },
+  "locationTypes": {
+    "airport": "Flughafen",
+    "train_station": "Bahnhof",
+    "bus_station": "Busbahnhof",
+    "hotel": "Hotel",
+    "hospital": "Spital",
+    "university": "Universität",
+    "city": "Stadt",
+    "town": "Stadt",
+    "village": "Dorf",
+    "address": "Adresse"
+  },
+  "search": {
+    "placeholder": "Suchen...",
+    "noResults": "Keine Standorte gefunden",
+    "minChars": "Gib mindestens 2 Zeichen ein",
+    "houseNumberHint": "Für eine genaue Ankunft gib die Hausnummer an.",
+    "expanded": "Erweiterte Suche: auch gesucht als",
+    "switzerland": "Schweiz",
+    "liechtenstein": "Liechtenstein"
+  },
+  "cta": {
+    "title": "Bist du Fahrer in der Schweiz?",
+    "subtitle": "Tritt unserer Plattform bei und verbinde dich mit tausenden Passagieren. Erstelle dein professionelles Profil kostenlos.",
+    "button": "Mein Profil kostenlos erstellen"
+  },
+  "footer": {
+    "copyright": "© {year} TaxiZone. Alle Rechte vorbehalten.",
+    "attribution": "Adressdaten von © OpenStreetMap"
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "common": {
+    "appName": "TaxiZone",
+    "tagline": "Your taxi in Switzerland just a click away",
+    "loading": "Loading...",
+    "search": "Search",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "back": "Back",
+    "seeAll": "See all",
+    "verified": "Verified",
+    "top": "Top",
+    "available24h": "24/7"
+  },
+  "header": {
+    "cantons": "Cantons",
+    "login": "Login",
+    "register": "Become a driver",
+    "drivers": "Drivers"
+  },
+  "hero": {
+    "badge": "Connect with verified drivers in seconds",
+    "title": "Your taxi in {country}",
+    "titleHighlight": "Switzerland",
+    "subtitle": "Where are you and where do you want to go? Find professional taxi drivers for your trip.",
+    "originPlaceholder": "Where do you want to leave from?",
+    "destinationPlaceholder": "Where do you want to go?",
+    "searchButton": "Find available taxis",
+    "fromAirport": "From airport",
+    "toAirport": "To airport",
+    "liechtenstein": "Liechtenstein"
+  },
+  "stats": {
+    "drivers": "Drivers",
+    "availability": "Availability",
+    "verified": "Verified"
+  },
+  "route": {
+    "calculating": "Calculating route...",
+    "kmEstimated": "km estimated",
+    "minApprox": "min approx",
+    "chfEstimated": "CHF estimated",
+    "priceNote": "* Estimated price. The driver will confirm the final price."
+  },
+  "drivers": {
+    "title": "Available drivers",
+    "titleRoute": "Taxis: {from} → {to}",
+    "titleLocation": "Taxis in {location}",
+    "found": "drivers found",
+    "tripOf": "Trip of {km} km",
+    "tripDistance": "Trip distance:",
+    "estimatedPrice": "Estimated price:",
+    "call": "Call",
+    "whatsapp": "WhatsApp",
+    "noDrivers": "No drivers found",
+    "noDriversRoute": "No taxis available for this route",
+    "tryAnother": "Try another location or search in a larger nearby city",
+    "viewAll": "View all available taxis",
+    "yearsExperience": "years"
+  },
+  "services": {
+    "airport": "Airport",
+    "city": "City",
+    "long_distance": "Long distance",
+    "limousine": "Limousine",
+    "corporate": "Corporate",
+    "events": "Events"
+  },
+  "vehicleTypes": {
+    "taxi": "Taxi",
+    "limousine": "Limousine",
+    "van": "Van",
+    "premium": "Premium"
+  },
+  "locationTypes": {
+    "airport": "Airport",
+    "train_station": "Train station",
+    "bus_station": "Bus station",
+    "hotel": "Hotel",
+    "hospital": "Hospital",
+    "university": "University",
+    "city": "City",
+    "town": "Town",
+    "village": "Village",
+    "address": "Address"
+  },
+  "search": {
+    "placeholder": "Search...",
+    "noResults": "No locations found",
+    "minChars": "Type at least 2 characters to search",
+    "houseNumberHint": "For exact arrival, provide the house number.",
+    "expanded": "Expanded search: also searched as",
+    "switzerland": "Switzerland",
+    "liechtenstein": "Liechtenstein"
+  },
+  "cta": {
+    "title": "Are you a driver in Switzerland?",
+    "subtitle": "Join our platform and connect with thousands of passengers. Create your professional profile for free.",
+    "button": "Create my free profile"
+  },
+  "footer": {
+    "copyright": "© {year} TaxiZone. All rights reserved.",
+    "attribution": "Address data from © OpenStreetMap"
+  }
+}
