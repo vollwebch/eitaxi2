@@ -7,17 +7,35 @@ import { requireAuth } from '@/lib/auth'
 // Activar/desactivar GPS y configurar horarios
 // ============================================
 
-// GET - Obtener configuración actual
+// GET - Obtener configuración actual (requiere autenticación del propio conductor)
 export async function GET(request: NextRequest) {
   try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
-    const driverId = searchParams.get('driverId')
+    const driverId = searchParams.get('driverId') || session.driverId
 
     if (!driverId) {
       return NextResponse.json({
         success: false,
         error: 'driverId requerido'
       }, { status: 400 })
+    }
+
+    // Solo el propio conductor puede ver su config de tracking
+    if (driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
     }
 
     const driver = await db.taxiDriver.findUnique({

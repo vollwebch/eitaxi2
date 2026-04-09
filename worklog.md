@@ -769,3 +769,33 @@ Stage Summary:
 - Widget PWA es ahora una app independiente que requiere autenticación
 - Flujo: Instalar widget → Abrir app → Si no hay sesión → Login → Después del login vuelve al widget con GPS activo
 - La cookie HTTP-only se usa para validar la sesión (seguro, no accesible desde JS)
+
+---
+Task ID: 3
+Agent: main
+Task: Auditoria legal nDSG completa - correccion de problemas de privacidad y seguridad
+
+Work Log:
+- Auditoria completa de 35 archivos del proyecto (25 API routes, 8 componentes, schema BD, config)
+- Identificados 17 problemas criticos y 12 moderados bajo la ley suiza nDSG
+- Eliminado fallback de clave JWT hardcodeada en src/lib/auth.ts
+- Cambiado cookie sameSite de 'lax' a 'strict' en sessionCookieOptions
+- Eliminado fallback a cookie legada eitaxi_driver_id en src/hooks/useSession.ts
+- Aeladida autenticacion requerida al GET de /api/driver/tracking
+- Aeladido rate limiting (60 req/min) al endpoint /api/driver/location/[id]
+- Ocultados telefonos y WhatsApp de APIs publicas (/taxis/live, /taxis/search)
+- Eliminados speed/heading/accuracy de la respuesta publica GPS
+- Aeladido rate limiting (3/hora/IP) y moderacion al POST de /api/reviews
+- Sanitizados todos los console.log con datos personales en drivers, security, search
+- Reforzada politica de contrasenas: 8+ caracteres + complejidad (letra y numero)
+- Creado endpoint /api/driver/data-export (GET) para derecho de acceso nDSG Art. 25
+- Creado endpoint /api/driver/delete-account (DELETE) para derecho de supresion nDSG Art. 27
+- Actualizado componente DataManagement para usar nuevos endpoints con auth JWT
+- Generado informe PDF de cumplimiento legal
+
+Stage Summary:
+- 13 problemas criticos corregidos en codigo
+- 2 nuevos endpoints creados (data-export, delete-account)
+- Compilacion exitosa sin errores
+- Informe de cumplimiento generado: /download/eitaxi-informe-cumplimiento-nDSG.pdf
+- Pendientes: traduccion privacy policy a aleman, banner cookies, disclosure AI service

@@ -49,7 +49,7 @@ export default function DataManagement({ driverId, driverName, driverEmail }: Da
     setExportSuccess(false);
 
     try {
-      const response = await fetch(`/api/driver/data-export?driverId=${driverId}`);
+      const response = await fetch(`/api/driver/data-export`);
       const data = await response.json();
 
       if (data.success) {
@@ -85,7 +85,7 @@ export default function DataManagement({ driverId, driverName, driverEmail }: Da
     setIsDeleting(true);
 
     try {
-      const response = await fetch(`/api/driver/delete?driverId=${driverId}`, {
+      const response = await fetch(`/api/driver/delete-account`, {
         method: "DELETE",
       });
       const data = await response.json();

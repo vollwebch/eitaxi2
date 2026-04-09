@@ -50,10 +50,10 @@ function validateRequiredFields(body: any): { valid: boolean; missing: string[];
     fieldErrors['email'] = 'El email es obligatorio'
   }
   
-  if (!body.password || body.password.length < 6) {
+  if (!body.password || body.password.length < 8) {
     missing.push('contraseña')
-    errors.push('Paso 1: La contraseña es obligatoria (mínimo 6 caracteres)')
-    fieldErrors['password'] = 'La contraseña es obligatoria (mínimo 6 caracteres)'
+    errors.push('Paso 1: La contraseña es obligatoria (mínimo 8 caracteres)')
+    fieldErrors['password'] = 'La contraseña es obligatoria (mínimo 8 caracteres)'
   }
   
   // Paso 2: Ubicación - aceptar tanto cityId/cantonId como baseCity/baseCanton
@@ -114,13 +114,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    // 🔍 Log del body recibido para debugging
-    console.log('📦 [API] Body recibido:', JSON.stringify(body, null, 2));
+    // 🔒 SANITIZED LOG: No se registran datos personales
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📦 [API] Solicitud de registro recibida (campos omitidos por privacidad)');
+    }
     
     // Validación detallada
     const validation = validateRequiredFields(body)
     if (!validation.valid) {
-      console.error('❌ [API] Errores de validación:', validation.errors);
+    console.error('❌ [API] Errores de validación:', validation.errors.length, 'errores');
       return NextResponse.json(
         { 
           success: false, 
@@ -188,7 +190,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    console.log('✅ Password recibido, longitud:', password?.length || 0);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Password recibido, longitud:', password?.length || 0);
+    }
 
     // Usar cityId/cantonId o baseCity/baseCanton (para compatibilidad con ambos formatos)
     const cityId = bodyCityId || baseCity;
@@ -337,21 +341,10 @@ export async function POST(request: NextRequest) {
       ? vehicleTypes[0] 
       : vehicleType || 'taxi'
 
-    // 🔍 LOG DETALLADO ANTES DE CREAR
-    console.log('🔍 PRE-CREATE CHECK:');
-    console.log('  - name:', name?.substring(0, 20) || 'MISSING');
-    console.log('  - slug:', slug);
-    console.log('  - phone:', phone?.substring(0, 15) || 'MISSING');
-    console.log('  - email:', email?.toLowerCase() || 'MISSING');
-    console.log('  - cityId:', city.id);
-    console.log('  - cantonId:', finalCantonId);
-    console.log('  - vehicleType:', primaryVehicleType);
-    console.log('  - vehicleTypes:', JSON.stringify(vehicleTypes || [primaryVehicleType]));
-    console.log('  - services:', JSON.stringify(finalServices));
-    console.log('  - isAvailable24h:', isAvailable24h ?? true);
-    console.log('  - schedules:', schedules ? `${schedules.length} días` : 'null');
-    console.log('  - routes:', routes ? `${routes.length} rutas` : '0');
-    console.log('  - serviceZonesWithExclusions:', serviceZonesWithExclusions ? `${serviceZonesWithExclusions.length} zonas` : '0');
+    // 🔒 Log sanitizado: solo se registra información no sensible
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 PRE-CREATE CHECK: campos validados OK');
+    }
 
     // Crear el conductor con todos los campos
     const driver = await db.taxiDriver.create({
@@ -549,12 +542,12 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error: any) {
-    // 🔍 LOG DETALLADO DEL ERROR
-    console.error('❌ ERROR COMPLETO AL CREAR CONDUCTOR:');
-    console.error('  - Mensaje:', error?.message);
-    console.error('  - Código:', error?.code);
-    console.error('  - Meta:', error?.meta);
-    console.error('  - Stack:', error?.stack);
+    // 🔒 Error sanitizado en producción
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ ERROR AL CREAR CONDUCTOR:', error?.message);
+    } else {
+      console.error('❌ Error al crear conductor');
+    }
     
     // Error específico de Prisma
     if (error?.code) {
@@ -911,7 +904,9 @@ export async function PUT(request: NextRequest) {
       dataToUpdate.serviceZones = JSON.stringify(zoneNames)
     }
 
-    console.log('📦 [PUT] Datos a actualizar:', Object.keys(dataToUpdate))
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📦 [PUT] Datos a actualizar:', Object.keys(dataToUpdate));
+    }
 
     // Actualizar el conductor
     const updatedDriver = await db.taxiDriver.update({
@@ -1036,9 +1031,8 @@ export async function PUT(request: NextRequest) {
       },
     })
   } catch (error: any) {
-    console.error('❌ [PUT] Error updating driver:', error)
-    console.error('❌ [PUT] Error message:', error?.message)
-    console.error('❌ [PUT] Error stack:', error?.stack)
+    // 🔒 Error sanitizado
+    console.error('❌ [PUT] Error updating driver:', error?.message || 'unknown');
     return NextResponse.json(
       { 
         success: false, 

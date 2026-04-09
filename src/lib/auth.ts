@@ -5,7 +5,10 @@ const SESSION_COOKIE_NAME = 'eitaxi_session_token';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 días
 
 function getSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'eitaxi-secret-key-2024';
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET no configurado. Define la variable de entorno JWT_SECRET.');
+  }
   return new TextEncoder().encode(secret);
 }
 
@@ -96,7 +99,7 @@ export const sessionCookieOptions = {
   name: SESSION_COOKIE_NAME,
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  sameSite: 'strict' as const,
   maxAge: SESSION_MAX_AGE,
   path: '/',
 };

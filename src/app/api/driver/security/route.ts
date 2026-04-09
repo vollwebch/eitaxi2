@@ -25,12 +25,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('🔐 Security change request:', {
-      driverId,
-      hasCurrentPassword: !!currentPassword,
-      newEmail: newEmail || 'no change',
-      hasNewPassword: !!newPassword
-    })
+    // 🔒 No se registran datos de seguridad en producción
+    // Solo se loguea en desarrollo para debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔐 Security change request for driver:', driverId);
+    }
 
     // Validation
     if (!driverId) {
@@ -96,19 +95,26 @@ export async function POST(request: NextRequest) {
       }
 
       updateData.email = newEmail.toLowerCase().trim()
-      console.log('✅ Email will be updated to:', updateData.email)
+      // Email actualizado (no se registra el valor por privacidad)
     }
 
     // Handle password change
     if (newPassword) {
-      if (newPassword.length < 6) {
+      if (newPassword.length < 8) {
         return NextResponse.json(
-          { success: false, error: 'La nueva contraseña debe tener al menos 6 caracteres' },
+          { success: false, error: 'La nueva contraseña debe tener al menos 8 caracteres' },
+          { status: 400 }
+        )
+      }
+      // Validar complejidad: al menos una letra y un número
+      if (!/[a-zA-Z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+        return NextResponse.json(
+          { success: false, error: 'La contraseña debe contener al menos una letra y un número' },
           { status: 400 }
         )
       }
       updateData.password = await bcrypt.hash(newPassword, 10)
-      console.log('✅ Password will be updated')
+      // Contraseña actualizada (no se registra por seguridad)
     }
 
     // If no actual changes to make
@@ -125,9 +131,7 @@ export async function POST(request: NextRequest) {
       data: updateData
     })
 
-    console.log('✅ Security changes saved for driver:', driverId)
-
-    // Build response message
+    console.log('✅ Security changes saved for driver:', driverId);
     const changes: string[] = []
     if (updateData.email) changes.push('email')
     if (updateData.password) changes.push('contraseña')

@@ -812,8 +812,9 @@ async function getDriversWithLocation(): Promise<DriverForSearch[]> {
       id: d.id,
       name: d.name,
       slug: d.slug,
-      phone: d.phone,
-      whatsapp: d.whatsapp,
+      // 🔒 Teléfono y WhatsApp se mantienen internos, no en la respuesta pública
+      // phone: d.phone,
+      // whatsapp: d.whatsapp,
       city: d.city,
       canton: d.canton,
       latitude: d.latitude,
@@ -1017,12 +1018,10 @@ export async function GET(request: NextRequest) {
     const cantonId = searchParams.get('cantonId');
     const query = searchParams.get('q');
 
-    console.log('🔍 ========== NUEVA BÚSQUEDA ==========');
-    console.log('📍 Origen:', originText || originLat || originId);
-    console.log('📍 Destino:', destinationText || destLat || destinationId);
-    console.log('👥 Pasajeros:', passengers);
-    console.log('🚗 Tipo vehículo:', vehicleType || 'cualquiera');
-    console.log('⏰ Reserva:', scheduledFor || 'inmediato');
+    // 🔒 Log sanitizado: no se registran coordenadas del cliente
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Búsqueda de taxis - parámetros de filtros aplicados');
+    }
 
     // =========================================================================
     // BÚSQUEDA DE RUTA (ORIGEN → DESTINO)
@@ -1035,8 +1034,7 @@ export async function GET(request: NextRequest) {
       const origin = await resolveLocation(originId, originType, originText, originLat, originLon);
       const destination = await resolveLocation(destinationId, destinationType, destinationText, destLat, destLon);
 
-      console.log('📍 Origen resuelto:', origin);
-      console.log('📍 Destino resuelto:', destination);
+    // 🔒 No se registran ubicaciones resueltas por privacidad
 
       // Obtener conductores
       const allDrivers = await getDriversWithLocation();
@@ -1045,7 +1043,9 @@ export async function GET(request: NextRequest) {
       let tripRoute: RouteInfo | null = null;
       if (origin && destination && origin.lat && origin.lon && destination.lat && destination.lon) {
         tripRoute = await calculateRoute(origin.lat, origin.lon, destination.lat, destination.lon);
-        console.log('🛣️ Ruta del viaje:', tripRoute);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🛣️ Ruta del viaje calculada:', tripRoute?.distanceKm, 'km');
+      }
       }
 
       const tripDistance = tripRoute?.distanceKm || 0;
@@ -1329,8 +1329,7 @@ export async function GET(request: NextRequest) {
         id: r.driver.id,
         name: r.driver.name,
         slug: r.driver.slug,
-        phone: r.driver.phone,
-        whatsapp: r.driver.whatsapp,
+        // 🔒 Teléfono no expuesto en API pública (nDSG)
         city: r.driver.city,
         canton: r.driver.canton,
         priority: r.priority.level,

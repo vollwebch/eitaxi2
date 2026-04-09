@@ -80,9 +80,35 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Crear nueva reseña
+// Crear nueva reseña (protegido contra spam con rate limiting por IP)
+const reviewRateLimiter = new Map<string, { count: number; resetAt: number }>();
+const REVIEW_RATE_LIMIT = 3; // max reviews per hour per IP
+const REVIEW_RATE_WINDOW = 60 * 60 * 1000; // 1 hour
+
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting por IP
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+    
+    const now = Date.now();
+    const record = reviewRateLimiter.get(clientIp);
+    if (record) {
+      if (now > record.resetAt) {
+        reviewRateLimiter.set(clientIp, { count: 1, resetAt: now + REVIEW_RATE_WINDOW });
+      } else if (record.count >= REVIEW_RATE_LIMIT) {
+        return NextResponse.json({
+          success: false,
+          error: 'Has enviado demasiadas reseñas. Intenta más tarde.'
+        }, { status: 429 })
+      } else {
+        record.count++;
+      }
+    } else {
+      reviewRateLimiter.set(clientIp, { count: 1, resetAt: now + REVIEW_RATE_WINDOW });
+    }
+
     const body = await request.json()
     const { driverId, rating, comment, name, tripRoute } = body
 
@@ -101,6 +127,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Validar longitud del comentario
+    if (comment && comment.length > 500) {
+      return NextResponse.json({
+        success: false,
+        error: 'El comentario no puede superar los 500 caracteres'
+      }, { status: 400 })
+    }
+
+    // Validar que el nombre no sea excesivamente largo
+    if (name && name.length > 50) {
+      return NextResponse.json({
+        success: false,
+        error: 'El nombre no puede superar los 50 caracteres'
+      }, { status: 400 })
+    }
+
     // Verificar que el conductor existe
     const driver = await db.taxiDriver.findUnique({
       where: { id: driverId }
@@ -113,7 +155,7 @@ export async function POST(request: NextRequest) {
       }, { status: 404 })
     }
 
-    // Crear la reseña
+    // Crear la reseña (pendiente de aprobación para evitar spam)
     const review = await db.review.create({
       data: {
         driverId,
@@ -121,7 +163,7 @@ export async function POST(request: NextRequest) {
         comment: comment?.trim() || null,
         name: name?.trim() || null,
         tripRoute: tripRoute?.trim() || null,
-        approved: true // Auto-aprobar por ahora
+        approved: false // Requiere moderación para cumplir nDSG
       }
     })
 

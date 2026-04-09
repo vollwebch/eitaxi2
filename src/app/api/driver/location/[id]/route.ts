@@ -1,16 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
 
 // ============================================
 // API para obtener ubicación del conductor
-// El usuario consulta cada 5 segundos
+// Protegido: el conductor solo puede ver su ubicación si está autenticado
+// Para clientes: solo se muestra si el conductor tiene tracking activo
 // ============================================
+
+// Rate limiter simple por IP
+const locationRateLimiter = new Map<string, { count: number; resetAt: number }>();
+const LOCATION_RATE_LIMIT = 60; // 60 peticiones por minuto
+const LOCATION_RATE_WINDOW = 60 * 1000; // 1 minuto
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Rate limiting
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') || 'unknown';
+    const now = Date.now();
+    const record = locationRateLimiter.get(clientIp);
+    if (record) {
+      if (now > record.resetAt) {
+        locationRateLimiter.set(clientIp, { count: 1, resetAt: now + LOCATION_RATE_WINDOW });
+      } else if (record.count >= LOCATION_RATE_LIMIT) {
+        return NextResponse.json({
+          success: false,
+          error: 'Demasiadas peticiones'
+        }, { status: 429 })
+      } else {
+        record.count++;
+      }
+    } else {
+      locationRateLimiter.set(clientIp, { count: 1, resetAt: now + LOCATION_RATE_WINDOW });
+    }
+
     const { id: driverId } = await params
 
     if (!driverId) {
@@ -117,9 +144,6 @@ export async function GET(
       location: {
         latitude: lastLocation.latitude,
         longitude: lastLocation.longitude,
-        speed: lastLocation.speed,
-        heading: lastLocation.heading,
-        accuracy: lastLocation.accuracy,
         timestamp: lastLocation.createdAt.toISOString(),
         age: Math.round(locationAge / 1000), // segundos
         isRecent

@@ -44,21 +44,8 @@ export function useSession(): UseSessionReturn {
       console.error('Error parsing session');
     }
 
-    // Check cookie as fallback
-    const cookies = document.cookie.split(';');
-    const driverIdCookie = cookies.find(c => c.trim().startsWith(`${SESSION_COOKIE}=`));
-    if (driverIdCookie) {
-      const driverId = driverIdCookie.split('=')[1];
-      // Create minimal session from cookie
-      const minimalSession: SessionData = {
-        driverId,
-        email: '',
-        name: '',
-        loginTime: new Date().toISOString(),
-      };
-      setSession(minimalSession);
-      return minimalSession;
-    }
+    // Cookie legada eliminada por seguridad - solo se usa JWT httpOnly
+    // Para obtener la sesión, se usa /api/auth/session que lee la cookie httpOnly
 
     setSession(null);
     return null;
