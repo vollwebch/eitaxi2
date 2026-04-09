@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
 
 // ============================================
 // API para guardar ubicación del conductor
@@ -8,8 +9,25 @@ import { db } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { driverId, latitude, longitude, speed, heading, accuracy } = body
+
+    if (body.driverId && body.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
+    }
 
     if (!driverId || !latitude || !longitude) {
       return NextResponse.json({
@@ -107,6 +125,15 @@ export async function POST(request: NextRequest) {
 // DELETE - Limpiar todas las ubicaciones del conductor (cuando desactiva GPS)
 export async function DELETE(request: NextRequest) {
   try {
+    try {
+      await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const driverId = searchParams.get('driverId')
 

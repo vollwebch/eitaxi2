@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
 import { determineCoverageType, getCityCoordinates, CITY_COORDINATES } from '@/lib/geo-osm'
 
 // Función para generar slug único
@@ -817,8 +818,25 @@ export async function GET(request: NextRequest) {
 // PUT - Update driver (for dashboard)
 export async function PUT(request: NextRequest) {
   try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { id, ...updateData } = body
+
+    if (id && id !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
+    }
 
     if (!id) {
       return NextResponse.json(

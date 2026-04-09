@@ -73,14 +73,16 @@ export function useSession(): UseSessionReturn {
     localStorage.removeItem('gps-notifications-enabled');
     localStorage.removeItem('gps-reminder-interval');
 
-    // Clear cookie
+    // Clear old cookie
     document.cookie = `${SESSION_COOKIE}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 
     // Clear state
     setSession(null);
 
-    // Redirect to home
-    window.location.href = '/';
+    // Call server-side logout to clear HTTP-only cookie
+    fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+      window.location.href = '/';
+    });
   }, []);
 
   return {

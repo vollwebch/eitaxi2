@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
 
 // ============================================
 // API para gestionar zonas de servicio del conductor
@@ -47,8 +48,25 @@ export async function GET(request: NextRequest) {
 // POST - Crear nueva zona
 export async function POST(request: NextRequest) {
   try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { driverId, zoneName, zoneType, zoneMode, exclusions } = body
+
+    if (body.driverId && body.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
+    }
 
     if (!driverId || !zoneName) {
       return NextResponse.json({
@@ -108,6 +126,15 @@ export async function POST(request: NextRequest) {
 // DELETE - Eliminar zona
 export async function DELETE(request: NextRequest) {
   try {
+    try {
+      await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const zoneId = searchParams.get('zoneId')
 
@@ -139,8 +166,25 @@ export async function DELETE(request: NextRequest) {
 // PUT - Actualizar zona (añadir/quitar exclusiones, cambiar zoneMode)
 export async function PUT(request: NextRequest) {
   try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { zoneId, driverId, exclusions, zoneMode } = body
+
+    if (body.driverId && body.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
+    }
 
     if (!zoneId || !driverId) {
       return NextResponse.json({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
+import { createSessionToken, sessionCookieOptions } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,10 +43,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Return driver data (without password)
+    // Crear token JWT firmado (server-side, seguro)
+    const sessionToken = await createSessionToken({
+      id: driver.id,
+      email: driver.email,
+      name: driver.name,
+    })
+
+    // Return driver data (without password) + cookie segura
     const { password: _, ...driverWithoutPassword } = driver
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       data: {
         ...driverWithoutPassword,
@@ -57,6 +65,11 @@ export async function POST(request: NextRequest) {
       },
       profileUrl: `/${driver.canton.slug}/${driver.city.slug}/${driver.slug}`,
     })
+
+    // Establecer cookie HTTP-only con el JWT firmado
+    response.cookies.set(sessionCookieOptions.name, sessionToken, sessionCookieOptions)
+
+    return response
   } catch (error) {
     console.error('Login error:', error)
     return NextResponse.json(

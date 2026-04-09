@@ -48,16 +48,14 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Save session to localStorage for PWA persistence
+        // La cookie HTTP-only segura ya fue establecida por el servidor (JWT firmado)
+        // Guardar info básica en localStorage solo para UI del cliente (NO para autenticación)
         localStorage.setItem('eitaxi_session', JSON.stringify({
           driverId: data.data.id,
           email: data.data.email,
           name: data.data.name,
           loginTime: new Date().toISOString(),
         }));
-        
-        // Also save to cookie for middleware/server-side access
-        document.cookie = `eitaxi_driver_id=${data.data.id}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
         
         // Redirect to dashboard
         router.push(`/dashboard/${data.data.id}`);
@@ -209,14 +207,16 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* Demo credentials hint */}
-        <div className="mt-6 p-4 bg-yellow-400/10 border border-yellow-400/30 rounded-lg">
-          <p className="text-sm text-center text-yellow-400">
-            <strong>Credenciales de prueba:</strong><br />
-            Email: paco@eitaxi.ch<br />
-            Contraseña: demo123456
-          </p>
-        </div>
+        {/* Demo credentials hint - only show in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-6 p-4 bg-yellow-400/10 border border-yellow-400/30 rounded-lg">
+            <p className="text-sm text-center text-yellow-400">
+              <strong>Credenciales de prueba:</strong><br />
+              Email: paco@taxizone.ch<br />
+              Contraseña: demo123456
+            </p>
+          </div>
+        )}
       </motion.div>
     </div>
     </SessionGuard>

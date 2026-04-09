@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
 
 // GET - Listar vehículos de un conductor
 export async function GET(request: NextRequest) {
@@ -35,6 +36,16 @@ export async function GET(request: NextRequest) {
 // POST - Crear nuevo vehículo
 export async function POST(request: NextRequest) {
   try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const {
       driverId,
@@ -48,6 +59,13 @@ export async function POST(request: NextRequest) {
       imageUrl,
       isPrimary
     } = body
+
+    if (body.driverId && body.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
+    }
 
     if (!driverId || !vehicleType) {
       return NextResponse.json(
@@ -106,8 +124,25 @@ export async function POST(request: NextRequest) {
 // PUT - Actualizar vehículo
 export async function PUT(request: NextRequest) {
   try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const body = await request.json()
     const { id, driverId, ...updateData } = body
+
+    if (body.driverId && body.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
+    }
 
     if (!id || !driverId) {
       return NextResponse.json(
@@ -171,6 +206,15 @@ export async function PUT(request: NextRequest) {
 // DELETE - Eliminar vehículo
 export async function DELETE(request: NextRequest) {
   try {
+    try {
+      await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
     const driverId = searchParams.get('driverId')
