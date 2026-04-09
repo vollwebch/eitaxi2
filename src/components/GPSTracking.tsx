@@ -163,6 +163,24 @@ export default function GPSTracking({
     return converted;
   }, []);
 
+  // Sincronizar el modo del tracking cuando is24h cambia
+  useEffect(() => {
+    if (loading) return; // No sincronizar hasta que los datos estén cargados
+    
+    const correctMode = is24h ? 'always' : (tracking.schedule.length > 0 ? 'schedule' : 'always');
+    if (tracking.mode !== correctMode) {
+      setTracking(prev => ({ ...prev, mode: correctMode }));
+      // También actualizar en la base de datos si el tracking está activo
+      if (tracking.enabled) {
+        fetch("/api/driver/tracking", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ driverId, mode: correctMode }),
+        }).catch(err => console.error("Error updating mode:", err));
+      }
+    }
+  }, [is24h, loading]);
+
   // Actualizar tracking cuando cambian los horarios externos
   useEffect(() => {
     // Solo sincronizar si tenemos horarios externos válidos
@@ -212,12 +230,14 @@ export default function GPSTracking({
     // Auto-habilitar tracking en la base de datos
     if (!trackingEnabledRef.current) {
       try {
+        // Determinar el modo correcto: si is24h → always, si hay schedule → schedule
+        const currentMode = is24h ? 'always' : (tracking.schedule.length > 0 ? 'schedule' : 'always');
         await fetch("/api/driver/tracking", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ driverId, enabled: true }),
+          body: JSON.stringify({ driverId, enabled: true, mode: currentMode }),
         });
-        setTracking(prev => ({ ...prev, enabled: true }));
+        setTracking(prev => ({ ...prev, enabled: true, mode: currentMode }));
         if (onTrackingChange) onTrackingChange(true);
       } catch (err) {
         console.error("Error enabling tracking:", err);
@@ -844,17 +864,20 @@ export default function GPSTracking({
         const res = await fetch(`/api/driver/tracking?driverId=${driverId}`);
         const data = await res.json();
         if (data.success) {
-          // Si ya tenemos horarios externos sincronizados, NO sobrescribir
-          // Los horarios deben venir del tab "Horarios", no de la API de tracking
+          // Si ya tenemos horarios externos sincronizados, NO sobrescribir schedule/mode
           if (hasExternalSchedulesRef.current) {
             setTracking(prev => ({
               ...prev,
               enabled: data.tracking.enabled,
               lastLocationAt: data.tracking.lastLocationAt,
-              // Preservar schedule y mode de los horarios externos
             }));
           } else {
-            setTracking(data.tracking);
+            // Si is24h está activo, forzar mode a 'always' independientemente de la BD
+            const correctMode = is24h ? 'always' : data.tracking.mode;
+            setTracking({
+              ...data.tracking,
+              mode: correctMode,
+            });
           }
         }
       } catch (error) {
@@ -865,7 +888,7 @@ export default function GPSTracking({
     };
 
     fetchTracking();
-  }, [driverId]);
+  }, [driverId, is24h]);
 
   // Guardar configuración de horarios
   const saveConfig = async (newConfig: Partial<TrackingConfig>) => {
