@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Navigation, Power, X, Bell, Loader2, MapPin, Shield, Eye, EyeOff, Download, Smartphone, Share2, Plus, Check } from "lucide-react";
+import { Navigation, Power, X, Bell, Loader2, MapPin, Shield, Eye, EyeOff, Download, Smartphone, Share2, Plus, Check, LogIn, Car, ArrowRight } from "lucide-react";
 import {
   subscribeToGPS,
   broadcastGPSState,
@@ -22,7 +22,9 @@ export default function WidgetPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [driverId, setDriverId] = useState<string | null>(null);
+  const [driverName, setDriverName] = useState<string | null>(null);
   const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // GPS Consent
   const [showGpsConsent, setShowGpsConsent] = useState(false);
@@ -38,7 +40,7 @@ export default function WidgetPage() {
   const sendIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isLocalChangeRef = useRef(false);
 
-  // Setup PWA install + driver ID
+  // Setup PWA install + check session
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches
       || (window.navigator as any).standalone === true;
@@ -59,29 +61,23 @@ export default function WidgetPage() {
     };
     window.addEventListener('beforeinstallprompt', handler);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    let id = urlParams.get('driverId');
-
-    if (!id) {
-      try {
-        const sessionData = localStorage.getItem('eitaxi_session');
-        if (sessionData) {
-          const session = JSON.parse(sessionData);
-          id = session.driverId;
+    // Check session via API
+    fetch('/api/auth/session')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.authenticated && data.data?.driverId) {
+          setDriverId(data.data.driverId);
+          setDriverName(data.data.name || null);
+          setIsAuthenticated(true);
+          localStorage.setItem('widget-driverId', data.data.driverId);
         }
-      } catch { /* ignore */ }
-    }
-
-    if (!id) {
-      id = localStorage.getItem('widget-driverId');
-    }
-
-    if (id) {
-      setDriverId(id);
-      localStorage.setItem('widget-driverId', id);
-    }
-
-    setLoading(false);
+      })
+      .catch(err => {
+        console.error('Session check error:', err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
 
     const savedGpsConsent = localStorage.getItem('gps-tracking-consent');
     if (savedGpsConsent === 'true') {
@@ -204,11 +200,6 @@ export default function WidgetPage() {
     }
   };
 
-  const setupDriver = () => {
-    const id = prompt('Introduce tu ID de conductor:');
-    if (id) { setDriverId(id); localStorage.setItem('widget-driverId', id); }
-  };
-
   const requestNotifications = async () => {
     if ('Notification' in window) {
       const permission = await Notification.requestPermission();
@@ -222,6 +213,7 @@ export default function WidgetPage() {
     }
   };
 
+  // ===== Loading =====
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -230,21 +222,58 @@ export default function WidgetPage() {
     );
   }
 
-  if (!driverId) {
+  // ===== Not authenticated → Login prompt =====
+  if (!isAuthenticated || !driverId) {
     return (
       <div className="min-h-screen bg-background p-6 flex flex-col items-center justify-center">
-        <div className="text-center max-w-sm">
+        <div className="text-center max-w-sm w-full">
           <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center">
             <Navigation className="h-10 w-10 text-black" />
           </div>
           <h1 className="text-2xl font-bold mb-2">eitaxi GPS</h1>
-          <p className="text-muted-foreground mb-6">Introduce tu ID de conductor</p>
-          <button onClick={setupDriver} className="w-full py-4 bg-yellow-400 text-black font-bold rounded-2xl text-lg">Configurar</button>
+          <p className="text-muted-foreground mb-2">Control rapido de GPS para conductores</p>
+          <p className="text-sm text-muted-foreground/70 mb-8">
+            Inicia sesion con tu cuenta de conductor para activar el seguimiento GPS
+          </p>
+
+          <a
+            href="/login?redirect=/widget"
+            className="w-full py-4 bg-yellow-400 text-black font-bold rounded-2xl text-lg flex items-center justify-center gap-2"
+          >
+            <LogIn className="h-5 w-5" />
+            Iniciar sesion
+          </a>
+
+          {!isStandalone && (
+            <div className="mt-8">
+              <p className="text-xs text-muted-foreground/50 mb-3">Quieres descargar esta app?</p>
+              <button
+                onClick={() => setShowInstall(true)}
+                className="w-full py-3 bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 rounded-xl flex items-center justify-center gap-2 text-sm font-medium"
+              >
+                <Download className="h-4 w-4" />
+                Instalar en tu movil
+              </button>
+            </div>
+          )}
+
+          {/* Install PWA Modal */}
+          <AnimatePresence>
+            {showInstall && (
+              <InstallModal
+                deviceType={deviceType}
+                deferredPrompt={deferredPrompt}
+                onInstall={handleInstall}
+                onClose={() => setShowInstall(false)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </div>
     );
   }
 
+  // ===== Authenticated → GPS Control =====
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* GPS Consent Dialog */}
@@ -283,6 +312,13 @@ export default function WidgetPage() {
           </div>
         </div>
       )}
+
+      {/* Driver info bar */}
+      <div className="p-4 text-center border-b border-border/50">
+        <p className="text-sm text-muted-foreground">
+          Hola, <span className="text-foreground font-medium">{driverName || 'Conductor'}</span>
+        </p>
+      </div>
 
       {/* Main GPS Button */}
       <div className="flex-1 flex flex-col items-center justify-center p-6">
@@ -353,7 +389,13 @@ export default function WidgetPage() {
         )}
 
         <div className="flex gap-2 text-sm">
-          <button onClick={setupDriver} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-center">Cambiar ID</button>
+          <button onClick={() => {
+            // Logout and redirect
+            localStorage.removeItem('widget-driverId');
+            fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+              window.location.href = '/login?redirect=/widget';
+            });
+          }} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-center">Cerrar sesion</button>
           <a href={`/dashboard/${driverId}`} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-center">Panel completo</a>
         </div>
       </div>
@@ -361,85 +403,109 @@ export default function WidgetPage() {
       {/* Install PWA Modal */}
       <AnimatePresence>
         {showInstall && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={() => setShowInstall(false)}
-          >
-            <div className="w-full max-w-sm bg-card border border-yellow-400/30 rounded-2xl p-5" onClick={e => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                  <Download className="h-5 w-5 text-yellow-400" />
-                  Instalar GPS Widget
-                </h3>
-                <button onClick={() => setShowInstall(false)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">Control rapido de GPS. Abre esta pagina para activar/desactivar el GPS con un toque desde tu pantalla de inicio.</p>
-
-              {deviceType === 'ios' && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0"><Share2 className="h-4 w-4 text-white" /></div>
-                    <div><p className="font-medium text-sm">1. Toca <strong>Compartir</strong></p><p className="text-xs text-muted-foreground">Abajo a la izquierda (cuadrado con flecha)</p></div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0"><Plus className="h-4 w-4 text-white" /></div>
-                    <div><p className="font-medium text-sm">2. Toca <strong>Anadir a pantalla de inicio</strong></p><p className="text-xs text-muted-foreground">Desliza los iconos hasta encontrarlo</p></div>
-                  </div>
-                  <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                    <div className="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center flex-shrink-0"><Check className="h-4 w-4 text-black" /></div>
-                    <div><p className="font-medium text-sm">3. Toca <strong>Anadir</strong></p><p className="text-xs text-muted-foreground">El icono aparecera en tu pantalla</p></div>
-                  </div>
-                </div>
-              )}
-
-              {deviceType === 'android' && (
-                <div className="space-y-3">
-                  {deferredPrompt ? (
-                    <button onClick={handleInstall} className="w-full py-4 rounded-xl bg-yellow-400 text-black font-bold text-lg flex items-center justify-center gap-2">
-                      <Smartphone className="h-5 w-5" /> Instalar ahora
-                    </button>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-8 h-8 rounded-lg bg-gray-500 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">...</div>
-                        <div><p className="font-medium text-sm">1. Toca el <strong>menu</strong> (tres puntos)</p><p className="text-xs text-muted-foreground">Arriba a la derecha del navegador</p></div>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0"><Plus className="h-4 w-4 text-white" /></div>
-                        <div><p className="font-medium text-sm">2. Toca <strong>Anadir a pantalla de inicio</strong></p><p className="text-xs text-muted-foreground">O Add to Home screen</p></div>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                        <div className="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center flex-shrink-0"><Check className="h-4 w-4 text-black" /></div>
-                        <div><p className="font-medium text-sm">3. Confirma tocando <strong>Anadir</strong></p><p className="text-xs text-muted-foreground">El icono aparecera en tu pantalla</p></div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {deviceType === 'desktop' && (
-                <div className="space-y-3">
-                  {deferredPrompt ? (
-                    <button onClick={handleInstall} className="w-full py-4 rounded-xl bg-yellow-400 text-black font-bold text-lg flex items-center justify-center gap-2">
-                      <Smartphone className="h-5 w-5" /> Instalar app
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <div className="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center flex-shrink-0"><Download className="h-4 w-4 text-black" /></div>
-                      <div><p className="font-medium text-sm">Busca el icono de instalar en la <strong>barra de direcciones</strong></p><p className="text-xs text-muted-foreground">O menu ... Instalar app</p></div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <button onClick={() => setShowInstall(false)} className="w-full mt-4 py-3 rounded-xl bg-muted text-muted-foreground font-medium">Entendido</button>
-            </div>
-          </motion.div>
+          <InstallModal
+            deviceType={deviceType}
+            deferredPrompt={deferredPrompt}
+            onInstall={handleInstall}
+            onClose={() => setShowInstall(false)}
+          />
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ============================================
+// Install Modal Component
+// ============================================
+function InstallModal({
+  deviceType,
+  deferredPrompt,
+  onInstall,
+  onClose,
+}: {
+  deviceType: 'ios' | 'android' | 'desktop';
+  deferredPrompt?: BeforeInstallPromptEvent | null;
+  onInstall?: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div className="w-full max-w-sm bg-card border border-yellow-400/30 rounded-2xl p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-lg flex items-center gap-2">
+            <Download className="h-5 w-5 text-yellow-400" />
+            Instalar GPS Widget
+          </h3>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">Control rapido de GPS. Abre esta pagina para activar/desactivar el GPS con un toque desde tu pantalla de inicio.</p>
+
+        {deviceType === 'ios' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center flex-shrink-0"><Share2 className="h-4 w-4 text-white" /></div>
+              <div><p className="font-medium text-sm">1. Toca <strong>Compartir</strong></p><p className="text-xs text-muted-foreground">Abajo a la izquierda (cuadrado con flecha)</p></div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0"><Plus className="h-4 w-4 text-white" /></div>
+              <div><p className="font-medium text-sm">2. Toca <strong>Anadir a pantalla de inicio</strong></p><p className="text-xs text-muted-foreground">Desliza los iconos hasta encontrarlo</p></div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center flex-shrink-0"><Check className="h-4 w-4 text-black" /></div>
+              <div><p className="font-medium text-sm">3. Toca <strong>Anadir</strong></p><p className="text-xs text-muted-foreground">El icono aparecera en tu pantalla</p></div>
+            </div>
+          </div>
+        )}
+
+        {deviceType === 'android' && (
+          <div className="space-y-3">
+            {deferredPrompt ? (
+              <button onClick={onInstall} className="w-full py-4 rounded-xl bg-yellow-400 text-black font-bold text-lg flex items-center justify-center gap-2">
+                <Smartphone className="h-5 w-5" /> Instalar ahora
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="w-8 h-8 rounded-lg bg-gray-500 flex items-center justify-center flex-shrink-0 text-white font-bold text-sm">...</div>
+                  <div><p className="font-medium text-sm">1. Toca el <strong>menu</strong> (tres puntos)</p><p className="text-xs text-muted-foreground">Arriba a la derecha del navegador</p></div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="w-8 h-8 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0"><Plus className="h-4 w-4 text-white" /></div>
+                  <div><p className="font-medium text-sm">2. Toca <strong>Anadir a pantalla de inicio</strong></p><p className="text-xs text-muted-foreground">O Add to Home screen</p></div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center flex-shrink-0"><Check className="h-4 w-4 text-black" /></div>
+                  <div><p className="font-medium text-sm">3. Confirma tocando <strong>Anadir</strong></p><p className="text-xs text-muted-foreground">El icono aparecera en tu pantalla</p></div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {deviceType === 'desktop' && (
+          <div className="space-y-3">
+            {deferredPrompt ? (
+              <button onClick={onInstall} className="w-full py-4 rounded-xl bg-yellow-400 text-black font-bold text-lg flex items-center justify-center gap-2">
+                <Smartphone className="h-5 w-5" /> Instalar app
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                <div className="w-8 h-8 rounded-lg bg-yellow-500 flex items-center justify-center flex-shrink-0"><Download className="h-4 w-4 text-black" /></div>
+                <div><p className="font-medium text-sm">Busca el icono de instalar en la <strong>barra de direcciones</strong></p><p className="text-xs text-muted-foreground">O menu ... Instalar app</p></div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <button onClick={onClose} className="w-full mt-4 py-3 rounded-xl bg-muted text-muted-foreground font-medium">Entendido</button>
+      </div>
+    </motion.div>
   );
 }

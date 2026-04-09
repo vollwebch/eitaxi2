@@ -750,3 +750,22 @@ Stage Summary:
 - Clients on home page (/): see PWA install banner + "Descargar app" in footer → installs app opening at /
 - Drivers on /widget: have their own install button → installs GPS widget opening at /widget
 - Dynamic manifest prevents wrong start_url for each audience
+
+---
+Task ID: 2
+Agent: main
+Task: Widget PWA requiere sesión - sin sesión redirige a login
+
+Work Log:
+- Creada API `/api/auth/session` (GET) que verifica la cookie HTTP-only y devuelve driverId, email, name
+- Actualizado `/widget` para verificar sesión via API al cargar
+- Si no hay sesión → muestra pantalla "Inicia sesión" con botón que redirige a `/login?redirect=/widget`
+- Si hay sesión → muestra el botón GPS con nombre del conductor
+- Añadido botón "Cerrar sesión" en el widget
+- Eliminado el prompt() manual para driverId, ahora usa siempre la sesión del login
+- Refactorizado modal de instalación en componente separado `InstallModal`
+
+Stage Summary:
+- Widget PWA es ahora una app independiente que requiere autenticación
+- Flujo: Instalar widget → Abrir app → Si no hay sesión → Login → Después del login vuelve al widget con GPS activo
+- La cookie HTTP-only se usa para validar la sesión (seguro, no accesible desde JS)
