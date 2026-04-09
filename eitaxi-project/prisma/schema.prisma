@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Canton {
+  id        String       @id @default(cuid())
+  name      String
+  code      String       @unique
+  slug      String       @unique
+  country   String       @default("CH")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  cities    City[]
+  locations Location[]
+  drivers   TaxiDriver[]
+
+  @@unique([name, country])
+}
+
+model City {
+  id         String       @id @default(cuid())
+  name       String
+  slug       String
+  cantonId   String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  latitude   Float?
+  longitude  Float?
+  population Int?
+  postalCode String?
+  canton     Canton       @relation(fields: [cantonId], references: [id])
+  locations  Location[]
+  drivers    TaxiDriver[]
+
+  @@unique([name, cantonId])
+  @@unique([slug, cantonId])
+}
+
+model Location {
+  id           String   @id @default(cuid())
+  name         String
+  type         String
+  street       String?
+  streetNumber String?
+  postalCode   String?
+  neighborhood String?
+  district     String?
+  latitude     Float?
+  longitude    Float?
+  poiType      String?
+  poiCategory  String?
+  cityId       String?
+  cantonId     String?
+  searchTerms  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  canton       Canton?  @relation(fields: [cantonId], references: [id])
+  city         City?    @relation(fields: [cityId], references: [id])
+
+  @@unique([name, type, postalCode])
+  @@index([name])
+  @@index([postalCode])
+  @@index([type])
+}
+
+model TaxiDriver {
+  id                  String              @id @default(cuid())
+  name                String
+  slug                String              @unique
+  phone               String
+  whatsapp            String?
+  email               String              @unique
+  password            String
+  cityId              String
+  cantonId            String
+  address             String?
+  latitude            Float?
+  longitude           Float?
+  operationRadius     Float               @default(15.0)
+  coverageType        String              @default("city")
+  experience          Int                 @default(1)
+  description         String?
+  originalDescription String?
+  imageUrl            String?
+  coverImageUrl       String?
+  vehicleType         String              @default("taxi")
+  vehicleTypes        String              @default("[\"taxi\"]")
+  vehicleBrand        String?
+  vehicleModel        String?
+  vehicleYear         Int?
+  vehicleColor        String?
+  passengerCapacity   Int?
+  isAvailable24h      Boolean             @default(true)
+  isActive            Boolean             @default(true)
+  workingHours        String?
+  services            String              @default("[]")
+  routes              String              @default("[]")
+  serviceZones        String              @default("[]")
+  basePrice           Float?
+  pricePerKm          Float?
+  hourlyRate          Float?
+  languages           String              @default("[]")
+  subscription        String              @default("free")
+  isVerified          Boolean             @default(false)
+  isTopRated          Boolean             @default(false)
+  views               Int                 @default(0)
+  contacts            Int                 @default(0)
+  rating              Float               @default(5.0)
+  reviewCount         Int                 @default(0)
+  website             String?
+  instagram           String?
+  facebook            String?
+  trackingEnabled     Boolean             @default(false)
+  trackingMode        String              @default("always")
+  trackingSchedule    String              @default("[]")
+  lastLocationAt      DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  locations           DriverLocation[]
+  driverRoutes        DriverRoute[]
+  schedules           DriverSchedule[]
+  driverServiceZones  DriverServiceZone[]
+  reviews             Review[]
+  city                City                @relation(fields: [cityId], references: [id])
+  canton              Canton              @relation(fields: [cantonId], references: [id])
+  vehicles            Vehicle[]
+}
+
+model DriverLocation {
+  id        String     @id @default(cuid())
+  driverId  String
+  latitude  Float
+  longitude Float
+  speed     Float?
+  heading   Float?
+  accuracy  Float?
+  createdAt DateTime   @default(now())
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([createdAt])
+}
+
+model Route {
+  id          String   @id @default(cuid())
+  origin      String
+  destination String
+  slug        String   @unique
+  popularity  Int      @default(0)
+  drivers     String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([origin, destination])
+}
+
+model DriverRoute {
+  id          String     @id @default(cuid())
+  driverId    String
+  origin      String
+  destination String
+  originType  String     @default("city")
+  destType    String     @default("city")
+  price       Float?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  driver      TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, origin, destination])
+}
+
+model DriverServiceZone {
+  id          String     @id @default(cuid())
+  driverId    String
+  zoneName    String
+  zoneType    String
+  zoneMode    String     @default("service")
+  postalCodes String     @default("[]")
+  exclusions  String     @default("[]")
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  boundingBox String?
+  centerLat   Float?
+  centerLon   Float?
+  osmId       Int?
+  driver      TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, zoneName, zoneMode])
+}
+
+model DriverSchedule {
+  id        String     @id @default(cuid())
+  driverId  String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, dayOfWeek])
+}
+
+model Review {
+  id        String     @id @default(cuid())
+  driverId  String
+  rating    Int
+  comment   String?
+  name      String?
+  tripRoute String?
+  approved  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([createdAt])
+}
+
+model Vehicle {
+  id                String     @id @default(cuid())
+  driverId          String
+  vehicleType       String
+  brand             String?
+  model             String?
+  year              Int?
+  color             String?
+  passengerCapacity Int?
+  licensePlate      String?
+  imageUrl          String?
+  isPrimary         Boolean    @default(false)
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  driver            TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([vehicleType])
+}

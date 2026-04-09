@@ -1,0 +1,43 @@
+{
+  "name": "eitaxi - Panel de Conductor",
+  "short_name": "eitaxi",
+  "description": "Gestiona tu perfil de taxi y activa tu GPS para recibir clientes",
+  "start_url": "/widget",
+  "display": "standalone",
+  "background_color": "#1a1a1f",
+  "theme_color": "#facc15",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["navigation", "business"],
+  "shortcuts": [
+    {
+      "name": "🟢 Activar GPS",
+      "short_name": "GPS",
+      "description": "Ir al control de GPS",
+      "url": "/widget",
+      "icons": [{ "src": "/icons/icon-512x512.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "📋 Mi Dashboard",
+      "short_name": "Dashboard",
+      "description": "Panel de control completo",
+      "url": "/login"
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

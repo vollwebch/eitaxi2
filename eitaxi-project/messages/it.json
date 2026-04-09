@@ -1,0 +1,108 @@
+{
+  "common": {
+    "appName": "TaxiZone",
+    "tagline": "Il tuo taxi in Svizzera a un clic di distanza",
+    "loading": "Caricamento...",
+    "search": "Cerca",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "close": "Chiudi",
+    "back": "Indietro",
+    "seeAll": "Vedi tutti",
+    "verified": "Verificato",
+    "top": "Top",
+    "available24h": "24/7"
+  },
+  "header": {
+    "cantons": "Cantoni",
+    "login": "Accedi",
+    "register": "Diventa autista",
+    "drivers": "Autisti"
+  },
+  "hero": {
+    "badge": "Connettiti con autisti verificati in pochi secondi",
+    "title": "Il tuo taxi in {country}",
+    "titleHighlight": "Svizzera",
+    "subtitle": "Dove sei e dove vuoi andare? Trova autisti di taxi professionisti per il tuo viaggio.",
+    "originPlaceholder": "Da dove vuoi partire?",
+    "destinationPlaceholder": "Dove vuoi andare?",
+    "searchButton": "Cerca taxi disponibili",
+    "fromAirport": "Dall'aeroporto",
+    "toAirport": "All'aeroporto",
+    "liechtenstein": "Liechtenstein"
+  },
+  "stats": {
+    "drivers": "Autisti",
+    "availability": "Disponibilità",
+    "verified": "Verificati"
+  },
+  "route": {
+    "calculating": "Calcolo del percorso...",
+    "kmEstimated": "km stimati",
+    "minApprox": "min ca.",
+    "chfEstimated": "CHF stimato",
+    "priceNote": "* Prezzo stimato. L'autista confermerà il prezzo finale."
+  },
+  "drivers": {
+    "title": "Autisti disponibili",
+    "titleRoute": "Taxi: {from} → {to}",
+    "titleLocation": "Taxi a {location}",
+    "found": "autisti trovati",
+    "tripOf": "Viaggio di {km} km",
+    "tripDistance": "Distanza viaggio:",
+    "estimatedPrice": "Prezzo stimato:",
+    "call": "Chiama",
+    "whatsapp": "WhatsApp",
+    "noDrivers": "Nessun autista trovato",
+    "noDriversRoute": "Nessun taxi disponibile per questo percorso",
+    "tryAnother": "Prova un'altra località o cerca in una città vicina più grande",
+    "viewAll": "Vedi tutti i taxi disponibili",
+    "yearsExperience": "anni"
+  },
+  "services": {
+    "airport": "Aeroporto",
+    "city": "Città",
+    "long_distance": "Lunga distanza",
+    "limousine": "Limousine",
+    "corporate": "Aziendale",
+    "events": "Eventi"
+  },
+  "vehicleTypes": {
+    "taxi": "Taxi",
+    "limousine": "Limousine",
+    "van": "Van",
+    "premium": "Premium"
+  },
+  "locationTypes": {
+    "airport": "Aeroporto",
+    "train_station": "Stazione ferroviaria",
+    "bus_station": "Stazione degli autobus",
+    "hotel": "Hotel",
+    "hospital": "Ospedale",
+    "university": "Università",
+    "city": "Città",
+    "town": "Città",
+    "village": "Paese",
+    "address": "Indirizzo"
+  },
+  "search": {
+    "placeholder": "Cerca...",
+    "noResults": "Nessuna località trovata",
+    "minChars": "Digita almeno 2 caratteri per cercare",
+    "houseNumberHint": "Per un arrivo preciso, indica il numero civico.",
+    "expanded": "Ricerca espansa: cercato anche come",
+    "switzerland": "Svizzera",
+    "liechtenstein": "Liechtenstein"
+  },
+  "cta": {
+    "title": "Sei un autista in Svizzera?",
+    "subtitle": "Unisciti alla nostra piattaforma e connettiti con migliaia di passeggeri. Crea il tuo profilo professionale gratuitamente.",
+    "button": "Crea il mio profilo gratis"
+  },
+  "footer": {
+    "copyright": "© {year} TaxiZone. Tutti i diritti riservati.",
+    "attribution": "Dati degli indirizzi da © OpenStreetMap"
+  }
+}
