@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://github.com/mauron85/cordova-plugin-background-geolocation",
+    "name": "mauron85/cordova-plugin-background-geolocation",
+    "snippet": "This plugin can be used for geolocation when the app is running in the foreground or background . It is more battery and data efficient than html5 geolocation .",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/63608415/ionic-5-angular-9-mauron85-cordova-plugin-background-geolocation-doesnt-st",
+    "name": "Ionic 5 / Angular 9: @mauron85/cordova-plugin-",
+    "snippet": "I'm using appflow to create the apk and tested it on a Samsung S8 / Android 7.0, it doesn't even prompt me to grant any access as it did for the ...",
+    "host_name": "stackoverflow.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.jsdelivr.com/package/npm/cordova-plugin-mauron85-background-geolocation-phonegapbuild",
+    "name": "cordova-plugin-mauron85-background-geolocation",
+    "snippet": "A free, fast, and reliable CDN for cordova-plugin-mauron85-background-geolocation -phonegapbuild. Cordova Background GeoLocation Plugin.",
+    "host_name": "www.jsdelivr.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.npmjs.com/~mauron85",
+    "name": "mauron85",
+    "snippet": "cordova-plugin-mauron85-background-geolocation. Cordova Background ... optimized background location tracking . mauron85. published 0.5.2 • 7 years ago ...",
+    "host_name": "www.npmjs.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://danielsogl.gitbook.io/awesome-cordova-plugins/background-geolocation-1",
+    "name": "Background Geolocation | Awesome Cordova Plugins - GitBook",
+    "snippet": "27 Jan 2022 — This plugin provide s foreground and background geolocation with battery-saving circular region monitoring and stop detection.",
+    "host_name": "danielsogl.gitbook.io",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

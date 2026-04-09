@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://github.com/haylltd/cordova-background-geolocation-plugin",
+    "name": "HaylLtd/cordova-background-geolocation-plugin - GitHub",
+    "snippet": "This plugin can be used for geolocation when the app is running in the foreground or background. It is more battery and data efficient than html5 geolocation. Missing: web PWA GPS screen",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://cordova.apache.org/docs/en/latest/reference/cordova-plugin-geolocation",
+    "name": "cordova-plugin-geolocation",
+    "snippet": "This plugin provides information about the device's location, such as latitude and longitude. Common sources of location information include Global Positioning ... Missing: capacitor web PWA",
+    "host_name": "cordova.apache.org",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://capacitorjs.com/docs/apis/geolocation",
+    "name": "Geolocation Capacitor Plugin API",
+    "snippet": "The Geolocation API provides simple methods for getting and tracking the current position of the device using GPS, along with altitude, heading, and speed ... Missing: free | Show results with: free",
+    "host_name": "capacitorjs.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://play.google.com/store/apps/details?id=com.transistorsoft.backgroundgeolocation.ionic2&hl=id",
+    "name": "Cordova BG Geolocation - Aplikasi di Google Play",
+    "snippet": "Cordova Background Geolocation demo aplikasi untuk Ionic 4. Plugin pelacakan lokasi dan platform geofencing paling canggih dengan kecerdasan deteksi gerakan ... Missing: free open capacitor web app PWA GPS tracking screen off",
+    "host_name": "play.google.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/transistorsoft/cordova-background-geolocation-lt",
+    "name": "GitHub - transistorsoft/cordova-background-geolocation-lt",
+    "snippet": "The most sophisticated background location-tracking & geofencing module with battery-conscious motion-detection intelligence for iOS and Android. Missing: PWA | Show results with: PWA",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://capgo.app/plugins/capacitor-background-geolocation",
+    "name": "Background Geolocation Capacitor Plugin: Install, Setup & Examples",
+    "snippet": "This comprehensive tutorial will guide you through integrating background geolocation features into your iOS and Android mobile apps built with Capacitor or ... Missing: free PWA GPS screen off",
+    "host_name": "capgo.app",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.npmjs.com/package/@capgo/background-geolocation",
+    "name": "Background Geolocation - Capgo - NPM",
+    "snippet": "A Capacitor plugin that lets you receive accurate geolocation updates even while the app is backgrounded. It has a web API to facilitate for ... Missing: PWA screen",
+    "host_name": "www.npmjs.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.transistorsoft.com/shop/products/cordova-background-geolocation",
+    "name": "Cordova Background Geolocation - Transistor Software",
+    "snippet": "The plugin can be configured to automatically start and stop tracking using a simple cron-like format. The scheduler can be configured to start on device boot.",
+    "host_name": "www.transistorsoft.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://forum.ionicframework.com/t/mauron85-cordova-plugin-background-geolocation/222705",
+    "name": "Mauron85/cordova-plugin-background-geolocation - Ionic Forum",
+    "snippet": "I have an issue respect to that. I have and app with geolocation and watchposition. But it does not worked fine on my cellphone. Get location while app is in background or screen is locked - Capacitor Cordova-plugin-background-geolocation - Ionic Forum More results from forum.ionicframework.com Missing: free open source web PWA GPS screen off",
+    "host_name": "forum.ionicframework.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/36036429/gps-coordinates-in-background-in-cordova-app",
+    "name": "GPS coordinates in background in cordova app - Stack Overflow",
+    "snippet": "I'm currently doing a hybrid app using ionic/cordova. The app needs functionality where it pings our backend with its location every 1 minute or so. Watch position in real time with Cordova BackgroundGeolocation ... cordova geolocation background android - Stack Overflow More results from stackoverflow.com Missing: capacitor PWA screen",
+    "host_name": "stackoverflow.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "url": "https://github.com/Cap-go/capacitor-background-geolocation",
+    "name": "Cap-go/capacitor-background-geolocation",
+    "snippet": "A Capacitor plugin that lets you receive accurate geolocation updates even while the app is backgrounded. It has a web API to facilitate for a similar usage ...",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://capgo.app/plugins/capacitor-background-geolocation",
+    "name": "Background Geolocation Capacitor Plugin: Install, Setup &",
+    "snippet": "The @capgo/capacitor-background-geolocation plugin en ables your iOS and Android mobile applications to leverage native background geolocation functionality ...",
+    "host_name": "capgo.app",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://capgo.app/docs/plugins/background-geolocation",
+    "name": "Background Geolocation - Capacitor Plugin Docs & Ex",
+    "snippet": "A Capacitor plugin that lets you receive accurate geolocation updates even while the app is backgrounded.",
+    "host_name": "capgo.app",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.transistorsoft.com/shop/products/capacitor-background-geolocation",
+    "name": "Capacitor Background Geolocation",
+    "snippet": "A highly configurable, cross-platform background location-tracking plugin implementing the latest native APIs.",
+    "host_name": "www.transistorsoft.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/transistorsoft/capacitor-background-geolocation",
+    "name": "transistorsoft/capacitor-background-geolocation: The most",
+    "snippet": "The most sophisticated background location-tracking & geofencing module with battery-conscious motion-detection intelligence for iOS and Android.",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  }
+]

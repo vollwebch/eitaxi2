@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://dev.to/mahmud-r-farhan/discover-realtime-location-tracker-an-open-source-pwa-for-real-time-device-monitoring-and-4nll",
+    "name": "Discover Realtime Location Tracker: An Open-Source PWA for Real",
+    "snippet": "This Progressive Web App (PWA) lets you monitor and track connected devices in real-time, complete with interactive maps, instant messaging, and ... Missing: background 2025",
+    "host_name": "dev.to",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://progressier.com/pwa-capabilities/geolocation",
+    "name": "Geolocation API - PWA Demo - Progressier",
+    "snippet": "Ready to generate your PWA? Try our PWA toolkit free of charge and without limits for 14 days. No credit card required. Generate PWA See plans. Missing: 2024 2025",
+    "host_name": "progressier.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://ampcode.com/threads/T-019b3e9a-9eb7-756f-a6f6-44c5d6ca3868",
+    "name": "PWA background geofencing strategy plan - Amp Code",
+    "snippet": "Key Insight: No browser allows direct geolocation access from service workers. The strategy must use hybrid approaches: service worker coordinates with the main ... Missing: free | Show results with: free",
+    "host_name": "ampcode.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://community.softr.io/t/track-gps-location-with-pwa/1574",
+    "name": "Track GPS location with PWA? - Softr Community",
+    "snippet": "Here's some custom code that will get the user's current geolocation and display it in a JavaScript alert popup, assuming they answer “yes” to the permission ... Missing: 2025 free",
+    "host_name": "community.softr.io",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://truetech.dev/mobile-apps-development/services/maps-geo/background-geolocation-tracking-mobile.html",
+    "name": "Background Geolocation Tracking Implementation in Mobile App",
+    "snippet": "Implementing continuous background GPS coordinate recording in mobile apps with power optimization and privacy policy compliance. Missing: 2024 2025",
+    "host_name": "truetech.dev",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://whatpwacando.today/geolocation",
+    "name": "Geolocation - What PWA Can Do Today",
+    "snippet": "The Geolocation API enables users to share their location with a web app. Below you will see your current location on a Google Map. Missing: 2024 2025 free",
+    "host_name": "whatpwacando.today",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.researchgate.net/publication/381388064_The_Implementation_of_PWA_Progressive_Web_App_Technology_in_Enhancing_Website_Performance_Mobile_Accessibility_The_Implementation_of_PWA_Progressive_Web_App_Technology_in_Enhancing_Website_Performance",
+    "name": "The Implementation of PWA (Progressive Web App) Technology in",
+    "snippet": "PWA offers a user experience similar to native apps without requiring installation from an app store. Additionally, PWAs also provide advantages ...",
+    "host_name": "www.researchgate.net",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.mendix.com/refguide/mobile/introduction-to-mobile-technologies/progressive-web-app",
+    "name": "Progressive Web App | Mendix Documentation",
+    "snippet": "Capable – PWAs can leverage several device capabilities like the camera and location, and can offer support for web push notifications. Note ...",
+    "host_name": "docs.mendix.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://appinstitute.com/9-pwa-security-practices-for-2025",
+    "name": "9 PWA Security Practices for 2025 - App Institute",
+    "snippet": "Explore essential security practices for Progressive Web Apps by 2025 to protect user data and enhance app resilience against growing ...",
+    "host_name": "appinstitute.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://love2dev.com/blog/html-geolocation",
+    "name": "Using the Geolocation API in your Progressive Web App - Love2Dev",
+    "snippet": "The geolocation API enables you to add precision location features to your progressive web application. You can get a single location or monitor changes for ... Missing: 2024 2025 free",
+    "host_name": "love2dev.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

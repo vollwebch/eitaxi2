@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://github.com/Cap-go/capacitor-background-geolocation",
+    "name": "Cap-go/capacitor-background-geolocation - GitHub",
+    "snippet": "A Capacitor plugin that lets you receive accurate geolocation updates even while the app is backgrounded. It has a web API to facilitate for a similar usage ... Missing: worker alternative",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://capacitorjs.com/docs/apis/geolocation",
+    "name": "Geolocation Capacitor Plugin API",
+    "snippet": "The Geolocation API provides simple methods for getting and tracking the current position of the device using GPS, along with altitude, heading, and speed ... Missing: worker alternative free",
+    "host_name": "capacitorjs.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://groups.google.com/a/chromium.org/g/chromium-dev/c/kDq4t93zbpA",
+    "name": "Background Geolocation for Progressive Web-Apps - Google Groups",
+    "snippet": "Single-process (Google Play etc) to monitor all geolocation reports for all Apps before deciding if ServiceWorker(s) need to be instantiated. Missing: capacitor alternative free",
+    "host_name": "groups.google.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/72422115/background-geolocation-tracking-using-service-worker-for-web-app",
+    "name": "Background geolocation tracking using Service Worker for web app",
+    "snippet": "An alternate can be to collect geolocation using Service Worker, save it in the queue when the phone is locked and send it all at once when the ... Web app fetching background geolocation using service worker and ... Track background location in webapp (service worker) More results from stackoverflow.com Missing: capacitor | Show results with: capacitor",
+    "host_name": "stackoverflow.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://forum.ionicframework.com/t/get-location-while-app-is-in-background-or-screen-is-locked/208732",
+    "name": "Get location while app is in background or screen is locked - Capacitor",
+    "snippet": "The app should be able to get my current accurate location say each 5 seconds, even when the app is in background or the screen is locked. Ionic - background tasks + GPS - Capacitor How to Auto Send Geolocation to API When Ionic Capacitor App is ... More results from forum.ionicframework.com Missing: worker alternative free web",
+    "host_name": "forum.ionicframework.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://npmjs.com/package/@transistorsoft/capacitor-background-geolocation?ref=pkgstats.com",
+    "name": "@transistorsoft/capacitor-background-geolocation - NPM",
+    "snippet": "The most sophisticated cross platform Capacitor background location tracking & geofencing module with battery-conscious motion-detection ... Missing: worker alternative free GPS",
+    "host_name": "npmjs.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://capgo.app/docs/plugins/background-geolocation",
+    "name": "Background Geolocation - Capacitor Plugin Docs & Ex - Capgo",
+    "snippet": "A Capacitor plugin that lets you receive accurate geolocation updates even while the app is backgrounded. Missing: worker alternative GPS",
+    "host_name": "capgo.app",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://medium.com/@kiranbjm/tracelet-the-free-open-source-alternative-to-flutter-background-geolocation-for-flutter-6b74b5a8bc1c",
+    "name": "Tracelet: The Free, Open-Source Alternative to  - Medium",
+    "snippet": "Tracelet is a fully open-source (Apache 2.0), production-grade background geolocation plugin for Flutter. It's written from scratch — no ...",
+    "host_name": "medium.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.transistorsoft.com",
+    "name": "Background Geolocation SDK - Transistor Software",
+    "snippet": "Battery-efficient, highly accurate background location tracking for iOS and Android — trusted by over 20,000+ apps in over 140 countries worldwide. Buy Now. Missing: worker alternative web",
+    "host_name": "docs.transistorsoft.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://bugs.webkit.org/show_bug.cgi?id=193946",
+    "name": "Add a mechanism to provide geolocation information in background",
+    "snippet": "The ServiceWorker can then decide to foregrouound the APP (and/or pop up toast about background tracking) or, Far more likely, just send an travel update to the ...",
+    "host_name": "bugs.webkit.org",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
