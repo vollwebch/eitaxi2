@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   description: "La plataforma líder de taxis en Suiza. Encuentra taxistas verificados, reserva traslados al aeropuerto, viajes de larga distancia y más. Conecta directamente con conductores profesionales.",
   keywords: ["taxi", "Suiza", "Zürich", "Ginebra", "Bern", "traslado", "aeropuerto", "taxista"],
   authors: [{ name: "eitaxi" }],
-  themeColor: "#facc15",
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚕</text></svg>",
     apple: "/icons/icon-192x192.png",
@@ -29,6 +28,10 @@ export const metadata: Metadata = {
     description: "Encuentra tu taxi ideal en Suiza. Taxistas verificados, servicio 24/7.",
     type: "website",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#facc15",
 };
 
 export default function RootLayout({
