@@ -799,3 +799,20 @@ Stage Summary:
 - Compilacion exitosa sin errores
 - Informe de cumplimiento generado: /download/eitaxi-informe-cumplimiento-nDSG.pdf
 - Pendientes: traduccion privacy policy a aleman, banner cookies, disclosure AI service
+---
+Task ID: 1
+Agent: Main Agent
+Task: Crear documento con lista de prompts para replicar todo el sistema de cliente de Eitaxi
+
+Work Log:
+- Exploré la rama backup-client-system para entender todos los archivos creados (31 archivos, 5065 líneas)
+- Leí todos los archivos clave: schema Prisma, APIs de auth/bookings/chat/notifications/push, componentes, librerías
+- Creé documento DOCX con 29 prompts bien definidos organizados por módulo
+- Incluí tabla de orden de ejecución para que otra IA pueda replicar paso a paso
+- Apliqué fix de XML (tags <0/> inválidos generados por docx-js)
+- Pasé verificación postcheck (0 errores)
+
+Stage Summary:
+- Documento generado: /home/z/my-project/download/Eitaxi-Prompts-Replicacion.docx (15KB)
+- 29 prompts cubriendo: Schema Prisma (6 modelos), Auth cliente (login/register/logout/session), CRUD de reservas, Chat, Notificaciones, Push notifications, Componentes UI, APIs auxiliares, Variables de entorno, Service Worker
+- Incluye orden de ejecución y regla crítica de no borrar lógica existente

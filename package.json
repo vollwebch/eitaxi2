@@ -51,6 +51,7 @@
     "@tanstack/react-table": "^8.21.3",
     "@types/leaflet": "^1.9.21",
     "@upstash/redis": "^1.37.0",
+    "adm-zip": "^0.5.17",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
