@@ -1,0 +1,3199 @@
+const fs = require('fs');
+
+// ============================================================
+// GENERADOR DE PROMPTS COMPLETOS PARA REPLICAR EITAXI
+// ============================================================
+
+const S = `================================================================================
+           EITAXI - PROMPTS COMPLETOS PARA REPLICAR LA APLICACIÓN
+                    Plataforma Suiza de Taxis
+================================================================================
+
+Documento generado automáticamente. Contiene TODOS los prompts necesarios
+para replicar la aplicación Eitaxi desde cero, en orden de ejecución.
+
+Tecnologías: Next.js 15 App Router, TypeScript, Tailwind CSS 4, shadcn/ui,
+Framer Motion, Prisma + SQLite, Leaflet, OSRM, Nominatim/OSM
+
+REGLA FUNDAMENTAL: NUNCA borres la lógica existente. Solo agregar.
+Instalar dependencias con: bun add (NO npm install)
+Base de datos: SQLite en /home/z/my-project/db/custom.db
+
+================================================================================
+
+=== PROMPT 0: INSTRUCCIONES GENERALES DEL PROYECTO ===
+
+CONTEXTO DEL PROYECTO:
+Estás construyendo "Eitaxi", la plataforma líder de taxis en Suiza y Liechtenstein.
+Es una aplicación Next.js 15 App Router con Turbopack.
+
+STACK TECNOLÓGICO:
+- Framework: Next.js 15 (App Router) con output: "standalone"
+- Lenguaje: TypeScript (strict mode desactivada para builds)
+- Estilos: Tailwind CSS 4 con tw-animate-css
+- Componentes UI: shadcn/ui (basado en Radix UI)
+- Animaciones: Framer Motion 12
+- Base de datos: Prisma ORM con SQLite
+- Path de BD: file:/home/z/my-project/db/custom.db
+- Autenticación: JWT propio con jose (NO NextAuth para conductor)
+- Mapas: Leaflet + react-leaflet
+- Geocodificación: Nominatim (OSM), OSRM para rutas, Overpass API para límites
+- Cache: Redis (Upstash) con fallback a memoria
+- PWA: Service Worker personalizado
+- i18n: next-intl con 6 idiomas (es, de, en, fr, it, pt)
+- Paquetes clave: bcryptjs, jose, @upstash/redis, leaflet, react-leaflet,
+  sharp (para imágenes), z-ai-web-dev-sdk (para IA), framer-motion, lucide-react,
+  date-fns, recharts, zustand, react-hook-form, zod
+
+CONFIGURACIÓN:
+- Tema: DARK por defecto (html className="dark")
+- Color de acento: yellow-400 (#facc15)
+- Fuentes: Geist Sans + Geist Mono (next/font/google)
+- Todos los textos de la interfaz en ESPAÑOL
+- Metadata viewport themeColor: #facc15
+
+REGLAS ABSOLUTAS:
+1. NUNCA borres lógica existente. Solo AGREGAR o MODIFICAR lo solicitado.
+2. Instalar dependencias con: bun add <paquete> (NUNCA npm install)
+3. Respuestas API siempre en formato: { success: boolean, data?: any, error?: string }
+4. Todas las páginas usar "use client" cuando tengan estado o efectos
+5. Componentes shadcn/ui importar desde @/components/ui/
+6. Utilidades de Tailwind desde cn() en @/lib/utils.ts
+7. BD Prisma desde @/lib/db.ts (singleton)
+8. Autenticación desde @/lib/auth.ts (JWT con jose)
+9. Logger sanitizado: nunca mostrar datos personales en consola en producción
+
+DEPENDENCIAS PRINCIPALES (package.json):
+{
+  "next": "^16.1.1",
+  "react": "^19.0.0",
+  "react-dom": "^19.0.0",
+  "@prisma/client": "^6.11.1",
+  "prisma": "^6.11.1",
+  "bcryptjs": "^3.0.3",
+  "jose": "(incluido en Next.js)",
+  "@upstash/redis": "^1.37.0",
+  "leaflet": "^1.9.4",
+  "react-leaflet": "^5.0.0",
+  "@types/leaflet": "^1.9.21",
+  "framer-motion": "^12.23.2",
+  "lucide-react": "^0.525.0",
+  "sharp": "^0.34.3",
+  "next-intl": "^4.3.4",
+  "clsx": "^2.1.1",
+  "tailwind-merge": "^3.3.1",
+  "class-variance-authority": "^0.7.1",
+  "zod": "^4.0.2",
+  "react-hook-form": "^7.60.0",
+  "@hookform/resolvers": "^5.1.1",
+  "date-fns": "^4.1.0",
+  "recharts": "^2.15.4",
+  "zustand": "^5.0.6",
+  "z-ai-web-dev-sdk": "^0.0.17",
+  "next-themes": "^0.4.6",
+  "sonner": "^2.0.6",
+  "react-markdown": "^10.1.0",
+  "uuid": "^11.1.0",
+  "geolib": "^3.3.14",
+  "@dnd-kit/core": "^6.3.1",
+  "@dnd-kit/sortable": "^10.0.0"
+}
+
+next.config.ts:
+export default { output: "standalone", typescript: { ignoreBuildErrors: true }, reactStrictMode: false }
+
+
+================================================================================
+
+=== PROMPT 1: VARIABLES DE ENTORNO (.env) ===
+
+ARCHIVO: /home/z/my-project/.env
+
+Crear el archivo .env en la raíz del proyecto con las siguientes variables:
+
+\`\`\`env
+# Base de datos SQLite
+DATABASE_URL="file:/home/z/my-project/db/custom.db"
+
+# JWT - Autenticación de conductores
+JWT_SECRET="eitaxi-jwt-secret-change-in-production-2024"
+NEXTAUTH_SECRET="eitaxi-nextauth-secret-change-in-production-2024"
+
+# Redis Cache (Upstash) - Opcional, si no hay configurado usa memoria
+UPSTASH_REDIS_REST_URL=""
+UPSTASH_REDIS_REST_TOKEN=""
+
+# Email (Resend) - Para notificaciones y recuperación de password
+RESEND_API_KEY=""
+
+# Dominio de la aplicación
+NEXT_PUBLIC_APP_URL="https://eitaxi.ch"
+
+# Google Maps / AI (z-ai-web-dev-sdk para generación de descripciones)
+# Usado internamente por z-ai-web-dev-sdk
+
+# Environment
+NODE_ENV="development"
+\`\`\`
+
+NOTAS:
+- JWT_SECRET debe cambiarse en producción (mínimo 32 caracteres)
+- Si no hay Redis configurado, el sistema usa cache en memoria automáticamente
+- RESEND_API_KEY solo se necesita para enviar emails de recuperación
+- NEXT_PUBLIC_APP_URL se usa para links absolutos en emails
+
+
+================================================================================
+
+=== PROMPT 2: SCHEMA PRISMA COMPLETO ===
+
+ARCHIVO: /home/z/my-project/prisma/schema.prisma
+
+Crear el schema Prisma COMPLETO con TODOS los modelos y TODOS los campos:
+
+\`\`\`prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Canton {
+  id        String       @id @default(cuid())
+  name      String
+  code      String       @unique
+  slug      String       @unique
+  country   String       @default("CH")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  cities    City[]
+  locations Location[]
+  drivers   TaxiDriver[]
+
+  @@unique([name, country])
+}
+
+model City {
+  id         String       @id @default(cuid())
+  name       String
+  slug       String
+  cantonId   String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  latitude   Float?
+  longitude  Float?
+  population Int?
+  postalCode String?
+  canton     Canton       @relation(fields: [cantonId], references: [id])
+  locations  Location[]
+  drivers    TaxiDriver[]
+
+  @@unique([name, cantonId])
+  @@unique([slug, cantonId])
+}
+
+model Location {
+  id           String   @id @default(cuid())
+  name         String
+  type         String
+  street       String?
+  streetNumber String?
+  postalCode   String?
+  neighborhood String?
+  district     String?
+  latitude     Float?
+  longitude    Float?
+  poiType      String?
+  poiCategory  String?
+  cityId       String?
+  cantonId     String?
+  searchTerms  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  canton       Canton?  @relation(fields: [cantonId], references: [id])
+  city         City?    @relation(fields: [cityId], references: [id])
+
+  @@unique([name, type, postalCode])
+  @@index([name])
+  @@index([postalCode])
+  @@index([type])
+}
+
+model TaxiDriver {
+  id                  String              @id @default(cuid())
+  name                String
+  slug                String              @unique
+  phone               String
+  whatsapp            String?
+  email               String              @unique
+  password            String
+  cityId              String
+  cantonId            String
+  address             String?
+  latitude            Float?
+  longitude           Float?
+  operationRadius     Float               @default(15.0)
+  coverageType        String              @default("city")
+  experience          Int                 @default(1)
+  description         String?
+  originalDescription String?
+  imageUrl            String?
+  coverImageUrl       String?
+  vehicleType         String              @default("taxi")
+  vehicleTypes        String              @default("[\\"taxi\\"]")
+  vehicleBrand        String?
+  vehicleModel        String?
+  vehicleYear         Int?
+  vehicleColor        String?
+  passengerCapacity   Int?
+  isAvailable24h      Boolean             @default(true)
+  isActive            Boolean             @default(true)
+  workingHours        String?
+  services            String              @default("[]")
+  routes              String              @default("[]")
+  serviceZones        String              @default("[]")
+  basePrice           Float?
+  pricePerKm          Float?
+  hourlyRate          Float?
+  languages           String              @default("[]")
+  subscription        String              @default("free")
+  isVerified          Boolean             @default(false)
+  isTopRated          Boolean             @default(false)
+  views               Int                 @default(0)
+  contacts            Int                 @default(0)
+  rating              Float               @default(5.0)
+  reviewCount         Int                 @default(0)
+  website             String?
+  instagram           String?
+  facebook            String?
+  trackingEnabled     Boolean             @default(false)
+  trackingMode        String              @default("always")
+  trackingSchedule    String              @default("[]")
+  lastLocationAt      DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  locations           DriverLocation[]
+  driverRoutes        DriverRoute[]
+  schedules           DriverSchedule[]
+  driverServiceZones  DriverServiceZone[]
+  reviews             Review[]
+  city                City                @relation(fields: [cityId], references: [id])
+  canton              Canton              @relation(fields: [cantonId], references: [id])
+  vehicles            Vehicle[]
+}
+
+model DriverLocation {
+  id        String     @id @default(cuid())
+  driverId  String
+  latitude  Float
+  longitude Float
+  speed     Float?
+  heading   Float?
+  accuracy  Float?
+  createdAt DateTime   @default(now())
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([createdAt])
+}
+
+model Route {
+  id          String   @id @default(cuid())
+  origin      String
+  destination String
+  slug        String   @unique
+  popularity  Int      @default(0)
+  drivers     String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([origin, destination])
+}
+
+model DriverRoute {
+  id          String     @id @default(cuid())
+  driverId    String
+  origin      String
+  destination String
+  originType  String     @default("city")
+  destType    String     @default("city")
+  price       Float?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  driver      TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, origin, destination])
+}
+
+model DriverServiceZone {
+  id          String     @id @default(cuid())
+  driverId    String
+  zoneName    String
+  zoneType    String
+  zoneMode    String     @default("service")
+  postalCodes String     @default("[]")
+  exclusions  String     @default("[]")
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  boundingBox String?
+  centerLat   Float?
+  centerLon   Float?
+  osmId       Int?
+  driver      TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, zoneName, zoneMode])
+}
+
+model DriverSchedule {
+  id        String     @id @default(cuid())
+  driverId  String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, dayOfWeek])
+}
+
+model Review {
+  id        String     @id @default(cuid())
+  driverId  String
+  rating    Int
+  comment   String?
+  name      String?
+  tripRoute String?
+  approved  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([createdAt])
+}
+
+model Vehicle {
+  id                String     @id @default(cuid())
+  driverId          String
+  vehicleType       String
+  brand             String?
+  model             String?
+  year              Int?
+  color             String?
+  passengerCapacity Int?
+  licensePlate      String?
+  imageUrl          String?
+  isPrimary         Boolean    @default(false)
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  driver            TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([vehicleType])
+}
+
+model Client {
+  id              String       @id @default(cuid())
+  name            String
+  email           String       @unique
+  password        String
+  phone           String?
+  preferredLang   String       @default("es")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  bookings        Booking[]
+  messages        Message[]
+  notifications   Notification[]
+  pushSubscriptions ClientPushSubscription[]
+}
+
+model Booking {
+  id              String     @id @default(cuid())
+  clientId        String
+  driverId        String
+  status          String     @default("pending")
+  pickupAddress   String
+  pickupLat       Float?
+  pickupLon       Float?
+  destAddress     String?
+  destLat         Float?
+  destLon         Float?
+  scheduledFor    DateTime?
+  passengerCount  Int        @default(1)
+  price           Float?
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  client          Client     @relation(fields: [clientId], references: [id])
+  driver          TaxiDriver @relation(fields: [driverId], references: [id])
+}
+
+model Message {
+  id          String     @id @default(cuid())
+  bookingId   String?
+  senderId    String
+  receiverId  String
+  senderType  String
+  content     String
+  isRead      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  clientId    String
+  title       String
+  body        String
+  type        String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model ClientPushSubscription {
+  id        String   @id @default(cuid())
+  clientId  String
+  endpoint  String
+  keysAuth  String
+  keysP256dh String
+  createdAt DateTime @default(now())
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  driverId  String
+  endpoint  String
+  keysAuth  String
+  keysP256dh String
+  createdAt DateTime @default(now())
+}
+\`\`\`
+
+DESPUÉS de crear el schema, ejecutar:
+  bunx prisma db push
+  bunx prisma generate
+
+CAMPOS DEL TaxiDriver (44 campos totales):
+id, name, slug, phone, whatsapp, email, password, cityId, cantonId, address,
+latitude, longitude, operationRadius, coverageType, experience, description,
+originalDescription, imageUrl, coverImageUrl, vehicleType, vehicleTypes,
+vehicleBrand, vehicleModel, vehicleYear, vehicleColor, passengerCapacity,
+isAvailable24h, isActive, workingHours, services, routes, serviceZones,
+basePrice, pricePerKm, hourlyRate, languages, subscription, isVerified,
+isTopRated, views, contacts, rating, reviewCount, website, instagram,
+facebook, trackingEnabled, trackingMode, trackingSchedule, lastLocationAt,
+createdAt, updatedAt
+
+
+================================================================================
+
+=== PROMPT 3: ARCHIVO src/lib/db.ts — SINGLETON PRISMA ===
+
+ARCHIVO: /home/z/my-project/src/lib/db.ts
+
+\`\`\`typescript
+import { PrismaClient } from '@prisma/client'
+
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
+
+export const db =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  })
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+\`\`\`
+
+NOTA: Este patrón evita crear múltiples instancias de PrismaClient en desarrollo
+con hot-reloading. En producción solo se crea una instancia.
+
+
+================================================================================
+
+=== PROMPT 4: ARCHIVO src/lib/utils.ts — UTILIDAD cn() ===
+
+ARCHIVO: /home/z/my-project/src/lib/utils.ts
+
+\`\`\`typescript
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+\`\`\`
+
+NOTA: Esta función combina clsx y tailwind-merge para manejar clases de Tailwind
+condicionalmente. Es el estándar de shadcn/ui.
+
+
+================================================================================
+
+=== PROMPT 5: ARCHIVO src/lib/constants.ts — OPCIONES DEL SISTEMA ===
+
+ARCHIVO: /home/z/my-project/src/lib/constants.ts
+
+\`\`\`typescript
+/**
+ * Constantes compartidas entre Registro y Dashboard
+ */
+
+export const SERVICE_OPTIONS = [
+  { id: "airport", label: "Aeropuerto", description: "Traslados al aeropuerto" },
+  { id: "city", label: "Ciudad", description: "Viajes dentro de la ciudad" },
+  { id: "long_distance", label: "Larga distancia", description: "Viajes a otras ciudades" },
+  { id: "limousine", label: "Limusina", description: "Servicio de limusina" },
+  { id: "corporate", label: "Corporativo", description: "Servicio corporativo" },
+  { id: "events", label: "Eventos", description: "Eventos y celebraciones" },
+  { id: "delivery", label: "Entregas", description: "Entregas y mensajería" },
+  { id: "night", label: "Nocturno", description: "Servicio nocturno" },
+] as const;
+
+export const LANGUAGE_OPTIONS = [
+  { id: "de", label: "Alemán", flag: "🇩🇪" },
+  { id: "en", label: "Inglés", flag: "🇬🇧" },
+  { id: "fr", label: "Francés", flag: "🇫🇷" },
+  { id: "it", label: "Italiano", flag: "🇮🇹" },
+  { id: "es", label: "Español", flag: "🇪🇸" },
+  { id: "pt", label: "Portugués", flag: "🇵🇹" },
+  { id: "ru", label: "Ruso", flag: "🇷🇺" },
+  { id: "zh", label: "Chino", flag: "🇨🇳" },
+] as const;
+
+export const VEHICLE_TYPES = [
+  { id: "taxi", label: "Taxi", icon: "🚕", description: "Vehículo estándar" },
+  { id: "limousine", label: "Limusina", icon: "🚗", description: "Servicio premium" },
+  { id: "van", label: "Van / Minibus", icon: "🚐", description: "Grupos grandes" },
+  { id: "premium", label: "Premium", icon: "✨", description: "Alta gama" },
+] as const;
+\`\`\`
+
+NOTAS:
+- SERVICE_OPTIONS: 8 tipos de servicio disponibles
+- LANGUAGE_OPTIONS: 8 idiomas con bandera emoji
+- VEHICLE_TYPES: 4 tipos de vehículo con icono
+- Todas las opciones usan "as const" para tipos literales
+
+
+================================================================================
+
+=== PROMPT 6: ARCHIVO src/lib/cache.ts — CACHE DUAL REDIS/MEMORIA ===
+
+ARCHIVO: /home/z/my-project/src/lib/cache.ts
+
+Crear un sistema de cache dual que usa Redis (Upstash) cuando está disponible
+y fallback a cache en memoria.
+
+FUNCIONES PRINCIPALES:
+- getCached<T>(key: string): Promise<CacheResult<T> | null>
+  Retorna { data, fromCache: true } si existe, null si no.
+  Primero intenta Redis (clave: cache:{key}), luego memoria.
+
+- setCache<T>(key: string, data: T, ttlMs?: number = 30*60*1000): Promise<void>
+  Guarda en Redis con TTL en segundos, o en memoria con timestamp.
+
+- clearCache(): Promise<void>
+  Limpia toda la cache (memoria + intenta Redis keys).
+
+- getCacheStats(): Promise<{ type: 'redis' | 'memory', size?: number, keys?: string[] }>
+  Retorna estadísticas del cache.
+
+- warmupCache(warmupFn: (query: string) => Promise<any[]>): Promise<void>
+  Pre-calienta cache con búsquedas frecuentes: 'aeropuerto', 'flughafen',
+  'migros', 'bahnhof', 'zurich', 'basel', 'bern', 'luzern', 'geneva'.
+
+DETALLES DE IMPLEMENTACIÓN:
+- Redis lazy-loaded: solo se conecta si UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN existen
+- Importación dinámica: const { Redis } = await import('@upstash/redis')
+- Cache en memoria: Map<string, CacheEntry<T>> con timestamp y TTL
+- Cleanup cada 10 minutos para entradas expiradas
+- Máximo 500 entradas en memoria (elimina las 100 más antiguas cuando se excede)
+- Tipo RedisClient con get, setex, keys
+
+CONSTANTES DE WARMUP:
+const FREQUENT_SEARCHES = [
+  'aeropuerto', 'flughafen', 'airport',
+  'migros', 'coop', 'denner', 'aldi', 'lidl',
+  'bahnhof', 'hbf', 'hauptbahnhof',
+  'zurich', 'basel', 'bern', 'luzern', 'geneva',
+];
+
+
+================================================================================
+
+=== PROMPT 7: ARCHIVO src/app/layout.tsx — ROOT LAYOUT ===
+
+ARCHIVO: /home/z/my-project/src/app/layout.tsx
+
+\`\`\`typescript
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { Toaster } from "@/components/ui/toaster";
+import PWAInstallPrompt from "@/components/PWAInstallPrompt";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "eitaxi - Encuentra tu taxi en Suiza",
+  description: "La plataforma líder de taxis en Suiza...",
+  keywords: ["taxi", "Suiza", "Zürich", "Ginebra", "Bern", "traslado", "aeropuerto"],
+  authors: [{ name: "eitaxi" }],
+  icons: {
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚕</text></svg>",
+    apple: "/icons/icon-192x192.png",
+  },
+  openGraph: {
+    title: "eitaxi - Tu taxi en Suiza",
+    description: "Encuentra tu taxi ideal en Suiza. Taxistas verificados, servicio 24/7.",
+    type: "website",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#facc15",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="es" suppressHydrationWarning className="dark">
+      <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="eitaxi" />
+        <link rel="apple-touch-icon" href="/icons/icon-512x512.svg" />
+      </head>
+      <body className={\`\${geistSans.variable} \${geistMono.variable} antialiased bg-background text-foreground\`}>
+        {children}
+        <Toaster />
+        <PWAInstallPrompt />
+        <script dangerouslySetInnerHTML={{ __html: \`
+          // Dynamic manifest based on URL
+          (function() {
+            var path = window.location.pathname;
+            var manifestUrl = '/manifest-client.json';
+            if (path.startsWith('/widget') || path.startsWith('/gps-quick')) {
+              manifestUrl = '/manifest.json';
+            }
+            var link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = manifestUrl;
+            document.head.appendChild(link);
+          })();
+
+          // Register Service Worker
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js').then(
+                function(registration) { console.log('SW registered: ', registration); },
+                function(err) { console.log('SW registration failed: ', err); }
+              );
+            });
+          }
+        \` }} />
+      </body>
+    </html>
+  );
+}
+\`\`\`
+
+DETALLES IMPORTANTES:
+- html lang="es" con className="dark" para tema oscuro
+- suppressHydrationWarning para evitar warnings de hidratación
+- Geist Sans y Geist Mono como fuentes principales
+- PWA meta tags para Apple y Android
+- Toaster de shadcn/ui para notificaciones
+- PWAInstallPrompt componente personalizado
+- Script inline para:
+  1. Cambiar manifest.json dinámicamente según URL
+  2. Registrar Service Worker en /sw.js
+
+
+================================================================================
+
+=== PROMPT 8: ARCHIVO src/lib/auth.ts — AUTENTICACIÓN JWT CON JOSE ===
+
+ARCHIVO: /home/z/my-project/src/lib/auth.ts
+
+Sistema de autenticación JWT para conductores usando la librería jose.
+
+CONSTANTES:
+- SESSION_COOKIE_NAME = 'eitaxi_session_token'
+- SESSION_MAX_AGE = 60 * 60 * 24 * 30 (30 días)
+
+TIPO:
+interface SessionPayload {
+  driverId: string;
+  email: string;
+  name: string;
+  iat?: number;
+  exp?: number;
+}
+
+FUNCIONES EXPORTADAS:
+
+1. createSessionToken(driver: { id: string; email: string; name: string }): Promise<string>
+   - Crea JWT firmado con HS256
+   - Payload: { driverId, email, name }
+   - Header: { alg: 'HS256' }
+   - Expiración: SESSION_MAX_AGE segundos (30 días)
+   - Secret: process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+
+2. verifySessionToken(token: string): Promise<SessionPayload | null>
+   - Verifica JWT con jwtVerify de jose
+   - Retorna SessionPayload o null si inválido/expirado
+
+3. getServerSession(): Promise<SessionPayload | null>
+   - Lee cookie SESSION_COOKIE_NAME desde cookies() de next/headers
+   - Verifica el token y retorna sesión o null
+   - Para server components y API routes
+
+4. requireAuth(request?: Request): Promise<SessionPayload>
+   - Primero intenta leer desde cookies (server-side)
+   - Fallback: lee header Authorization: Bearer <token>
+   - Lanza Error('No autenticado') si no hay sesión válida
+
+5. sessionCookieOptions (objeto exportado):
+   { name: 'eitaxi_session_token', httpOnly: true, secure: production only,
+     sameSite: 'strict', maxAge: 30 días, path: '/' }
+
+DEPENDENCIAS: jose (viene con Next.js), next/headers
+
+
+================================================================================
+
+=== PROMPT 9: ARCHIVO src/middleware.ts — PROTECCIÓN DE RUTAS ===
+
+ARCHIVO: /home/z/my-project/src/middleware.ts
+
+Middleware de Next.js para proteger rutas y verificar sesión.
+
+RUTAS PROTEGIDAS (requieren auth):
+- /dashboard/ (dashboard de conductor)
+- /gps/ (página GPS)
+- /gps-quick (GPS rápido)
+- /registrarse (registro)
+
+RUTAS PÚBLICAS (no verifican auth):
+- /, /login, /api/, /_next/, /terminos, /privacidad,
+  /recuperar-password, /restablecer-password, /widget, /track/
+
+LÓGICA:
+1. Permitir siempre: assets estáticos, APIs, páginas públicas
+2. Para rutas protegidas:
+   a. Leer cookie SESSION_COOKIE_NAME
+   b. Si no existe → redirect a /login?redirect={pathname}
+   c. Si existe → verificar JWT con verifySessionToken()
+   d. Si token inválido → borrar cookie + redirect a /login
+3. Para /dashboard/[driverId]:
+   a. Verificar que driverId de URL === session.driverId
+   b. Si no coincide → redirect a /dashboard/{session.driverId}
+4. Para /gps/[driverId]: misma verificación de ownership
+
+CONFIG matcher:
+'/((?!_next/static|_next/image|favicon.ico|icons/|uploads/|manifest.json|sw.js|robots.txt).*)'
+
+
+================================================================================
+
+=== PROMPT 10: ARCHIVO src/hooks/useSession.ts — SESIÓN EN CLIENTE ===
+
+ARCHIVO: /home/z/my-project/src/hooks/useSession.ts
+
+Hook "use client" para gestión de sesión desde el cliente.
+
+CONSTANTES:
+- SESSION_KEY = 'eitaxi_session' (localStorage)
+- SESSION_COOKIE = 'eitaxi_driver_id' (legacy)
+
+TIPO:
+interface SessionData {
+  driverId: string;
+  email: string;
+  name: string;
+  loginTime: string;
+}
+
+RETORNO (UseSessionReturn):
+- session: SessionData | null
+- loading: boolean
+- isLoggedIn: boolean
+- logout(): void
+- checkSession(): SessionData | null
+
+FUNCIONAMIENTO:
+- checkSession(): Lee JSON de localStorage (SESSION_KEY), parsea y setea estado
+- logout(): Limpia localStorage (SESSION_KEY, widget-driverId, gps-notifications-enabled,
+  gps-reminder-interval), limpia cookie legacy, llama POST /api/auth/logout,
+  luego redirige a '/'
+- Al montar, ejecuta checkSession() y setea loading=false
+
+
+================================================================================
+
+=== PROMPT 11: ARCHIVO src/hooks/useLocale.ts — i18n LOCALE ===
+
+ARCHIVO: /home/z/my-project/src/hooks/useLocale.ts
+
+Hook "use client" para detección y cambio de idioma.
+
+DEPENDENCIAS:
+- useLocale, useTranslations de next-intl
+- Locale, localeNames, localeFlags, locales de @/i18n/config
+- useRouter, usePathname de @/i18n/routing
+
+RETORNO:
+- locale: Locale actual
+- t: función de traducción
+- changeLocale(newLocale: Locale): guarda cookie NEXT_LOCALE y navega con router.replace()
+- browserLocale: Locale detectado del navegador
+- localeName: nombre del locale actual
+- localeFlag: emoji bandera del locale actual
+- allLocales: array de { code, name, flag } para selector de idioma
+
+LOCALES DISPONIBLES: es, de, en, fr, it, pt
+LOCALE POR DEFECTO: en
+
+
+================================================================================
+
+=== PROMPT 12: ARCHIVO src/hooks/use-toast.ts — SISTEMA DE TOAST ===
+
+ARCHIVO: /home/z/my-project/src/hooks/use-toast.ts
+
+Sistema de notificaciones toast basado en shadcn/ui (react-hot-toast style).
+
+CONSTANTES:
+- TOAST_LIMIT = 1 (solo un toast a la vez)
+- TOAST_REMOVE_DELAY = 1000000ms
+
+TIPOS:
+- ToasterToast = ToastProps & { id, title?, description?, action? }
+- State = { toasts: ToasterToast[] }
+- Action = ADD | UPDATE | DISMISS | REMOVE
+
+FUNCIONES EXPORTADAS:
+- reducer(state, action): reducer para manejar acciones de toast
+- toast({ ...props }): función para crear toasts. Retorna { id, dismiss, update }
+- useToast(): hook que retorna { ...state, toast, dismiss }
+
+ESTADO: memoryState global + listeners pattern (sin React Context para ser ligero)
+
+
+================================================================================
+
+=== PROMPT 13: ARCHIVO src/app/page.tsx — PÁGINA PRINCIPAL (~1837 líneas) ===
+
+ARCHIVO: /home/z/my-project/src/app/page.tsx
+
+Esta es la página principal (home) de Eitaxi. Es la más compleja del proyecto.
+
+COMPONENTES INTERNOS (definidos en el mismo archivo):
+1. Header — Logo, navegación, selector de idioma, botón login/registro
+2. LocationInput — Input de origen y destino con autocompletado
+3. HeroSection — Sección hero con título y subtítulo
+4. TaxiCard — Tarjeta de taxista con badges y acciones
+5. MobileMenu — Menú hamburguesa para mobile
+6. ClientInstallButton — Botón de instalar PWA para clientes
+7. Footer — Pie de página con links
+
+ESTADO PRINCIPAL:
+- origin: { lat, lon, displayName, city, postalCode, canton, cantonCode } | null
+- destination: { lat, lon, displayName, city, postalCode, canton, cantonCode } | null
+- drivers: DriverResult[] — resultados de búsqueda
+- loading: boolean
+- searchPerformed: boolean
+- routeInfo: { distanceKm, durationMin, durationFormatted, geometry } | null
+- showMap: boolean
+- selectedCanton: string | null
+- originQuery / destinationQuery: string (texto del input)
+- searchHistory: SavedSearch[] (localStorage, max 10)
+- favorites: FavoriteDriver[] (localStorage, max 20)
+- isMobileMenuOpen: boolean
+
+FUNCIONALIDADES DE LocationInput:
+- Autocompletado con debounce (300ms)
+- Dual API: Photon + Nominatim
+- Mostrar resultados con iconos por tipo (ciudad, aeropuerto, estación, etc.)
+- Quick options: aeropuertos suizos (ZRH, GVA, BSL) + Liechtenstein
+- Click en resultado establece origen/destino
+- Botón "Usar mi ubicación" con geolocation API
+
+FUNCIONALIDADES DE búsqueda:
+- Al establecer origen Y destino → llamada a /api/taxis/search
+- Parámetros: originLat, originLon, destLat, destLon, originText, destText,
+  passengers, vehicleType, services
+- Mostrar resultados en grid responsivo (1/2/3/4 columnas según viewport)
+
+FUNCIONALIDADES de TaxiCard:
+- Foto de perfil circular con fallback emoji
+- Badges: ✅ Verificado, ⭐ Top Rated, 🕐 24/7, 📍 GPS Activo
+- Rating con estrellas (1-5)
+- Barra de idiomas con banderas
+- Precio estimado: { min } - { max } CHF
+- Botones: Ver perfil, Llamar, WhatsApp
+- Animación de entrada con Framer Motion (stagger)
+
+FUNCIONALIDADES de RouteMap:
+- Componente Leaflet que muestra la ruta entre origen y destino
+- Decode de polyline (OSRM geometry)
+- Marcadores para origen (verde) y destino (rojo)
+- Auto-fit bounds
+- Solo se muestra cuando routeInfo tiene geometry
+
+FUNCIONALIDADES de Canton Dropdown:
+- Select con todos los cantones + Liechtenstein
+- Mostrar número de conductores por cantón
+- Al seleccionar → filtrar taxis de esa zona via /api/taxis?canton={slug}
+
+FUNCIONALIDADES del Hero:
+- Título: "Encuentra tu taxi en Suiza"
+- Subtítulo: "Taxistas verificados, servicio 24/7"
+- Stats: "500+ conductores", "26 cantones", "24/7 disponible"
+- Fondo gradiente oscuro con patrón
+
+FUNCIONALIDADES de CTA Section:
+- "¿Eres taxista? Regístrate gratis"
+- Beneficios: perfil público, GPS tracking, gestión de reservas
+- Link a /registrarse
+
+FUNCIONALIDADES de Quick Options:
+- Botones rápidos para aeropuertos: Zürich (ZRH), Ginebra (GVA), Basel (BSL)
+- Botón "Liechtenstein"
+- Al hacer click → establece como destino y busca taxis
+
+FUNCIONALIDADES de Footer:
+- Links: /privacidad, /terminos, /widget
+- Copyright: "© 2024 eitaxi.ch"
+- Redes sociales (placeholder)
+
+DISEÑO (Tailwind CSS dark theme):
+- Fondo principal: bg-background (dark gray/black)
+- Acento principal: text-yellow-400, bg-yellow-400
+- Cards: bg-card border border-border rounded-xl
+- Botones primarios: bg-yellow-400 text-black hover:bg-yellow-500
+- Badges: variantes de colores (green-500, blue-500, purple-500)
+- Inputs: bg-card border-border focus:border-yellow-400
+- Responsive: mobile-first, breakpoints md/lg/xl
+
+
+================================================================================
+
+=== PROMPT 14: ARCHIVO src/lib/geo-osm.ts (~1091 líneas) ===
+
+ARCHIVO: /home/z/my-project/src/lib/geo-osm.ts
+
+Sistema completo de geolocalización usando APIs gratuitas de OpenStreetMap.
+
+TIPOS EXPORTADOS:
+
+interface NominatimAddress {
+  house_number?, road?, pedestrian?, suburb?, city?, town?, village?,
+  municipality?, county?, state?, postcode?, country?, country_code?: string
+}
+
+interface NominatimResult {
+  place_id, licence, osm_type, osm_id, lat, lon, display_name: string
+  address: NominatimAddress
+  boundingbox?: [string, string, string, string]
+  type?, class?, importance?: string/number
+}
+
+interface GeocodedLocation {
+  lat, lon: number
+  display_name, city, postalCode, canton, cantonCode, country, countryCode: string
+  boundingBox?: { south, north, west, east }
+  type: 'city' | 'town' | 'village' | 'address' | 'postcode' | 'state' | 'other'
+  osmId?: number; osmType?: string
+}
+
+interface OSRMRoute {
+  distance: number (metros), duration: number (segundos)
+  geometry: string (polyline encoded)
+  legs: Array<{ distance, duration, steps }>
+}
+
+interface RouteInfo {
+  distanceKm, durationMin: number; durationFormatted: string; geometry?: string
+}
+
+interface OSMBoundary {
+  osm_id, name: string; admin_level: number
+  boundary_type: string; geometry: { type, coordinates }
+  bbox?: [west, south, east, north]
+}
+
+interface DriverZone {
+  zoneName: string
+  zoneType: 'country' | 'canton' | 'district' | 'municipality' | 'city' | 'custom'
+  zoneMode: 'pickup' | 'service'
+  exclusions?: string[]
+  boundingBox?: { south, north, west, east }
+  center?: { lat, lon }; osmId?: number
+}
+
+CONSTANTES:
+- NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org'
+- OSRM_BASE_URL = 'https://router.project-osrm.org'
+- OVERPASS_BASE_URL = 'https://overpass-api.de/api/interpreter'
+- CACHE_TTL = 1000 * 60 * 60 (1 hora)
+- REQUEST_TIMEOUT = 10000 (10 seg)
+- HEADERS: { 'User-Agent': 'EiTaxi/1.0 (contact@eitaxi.ch)', Accept-Language: 'de,en' }
+
+FUNCIONES EXPORTADAS:
+
+1. geocodeAddress(searchText, options?): Promise<GeocodedLocation[]>
+   - Convierte texto en coordenadas y datos estructurados
+   - Params: countrycodes='ch,li,de,at,fr,it', limit=5, addressdetails=1
+   - Cache por clave: 'geocode|{text}|{countrycodes}'
+   - Retorna array de GeocodedLocation con city, canton, cantonCode extraídos
+
+2. reverseGeocode(lat, lon): Promise<GeocodedLocation | null>
+   - Coordenadas → dirección estructurada
+   - Cache: 'reverse|{lat}|{lon}'
+
+3. calculateRoute(originLat, originLon, destLat, destLon, profile='car'): Promise<RouteInfo | null>
+   - OSRM: /route/v1/{profile}/{lon},{lat};{lon},{lat}?overview=full&geometries=polyline
+   - Cache: 'route|{coords}'
+   - Retorna distanceKm, durationMin, durationFormatted, geometry
+
+4. calculateDistanceMatrix(sources, destinations, profile='car'): Promise<Array<Array<{distance, duration}>> | null>
+   - OSRM table API para múltiples orígenes/destinos
+
+5. getBoundary(name, adminLevel=4, countryCode='CH'): Promise<OSMBoundary | null>
+   - Overpass API para límites administrativos
+   - admin_level: 4=cantón, 6=distrito, 8=municipio
+   - Cache: 24 horas para boundaries
+
+6. isPointInZone(lat, lon, zone): boolean
+   - Verifica si un punto está dentro de bounding box
+
+7. isPointInPolygon(lat, lon, polygon: [lon,lat][]): boolean
+   - Ray casting algorithm
+
+8. isLocationInExclusions(location, exclusions[]): { vetoed: boolean; reason: string }
+   - VERIFICACIÓN DE EXCLUSIÓN CON PRIORIDAD ABSOLUTA
+   - Compara ciudad, cantón, código postal, displayName contra exclusiones
+   - Normaliza textos (quita acentos, minúsculas)
+   - Retorna { vetoed: true } si cualquier exclusión coincide
+
+9. isLocationCoveredByZones(location, driverZones[]): Promise<{ covered, zoneName, reason }>
+   - Para cada zona del conductor:
+     a. Si tiene boundingBox → verificar punto dentro
+     b. Por zoneType: country, canton, district, municipality, city
+     c. Cantón: verificar por código, nombre, equivalencias
+     d. Distrito: verificar municipios del distrito
+     e. Municipality/City: verificar por nombre
+
+10. calculateStraightLineDistance(lat1, lon1, lat2, lon2): number
+    - Fórmula de Haversine (radio Tierra = 6371 km)
+
+11. CITY_COORDINATES: Record<string, { lat, lng }>
+    - Coordenadas de ~35 ciudades principales de Suiza y Liechtenstein
+
+12. getCityCoordinates(cityName, cantonCode?): { lat, lng } | null
+    - Busca en CITY_COORDINATES con normalización de acentos
+
+13. determineCoverageType(cantonCode, country?): { coverageType, operationRadius, reason }
+    - Liechtenstein → country, 20km
+    - GR, VS, TI, BE → regional, 50km
+    - ZH, GE, BS, BL → canton, 25km
+    - Default → canton, 30km
+
+FUNCIONES INTERNAS:
+- extractCantonCode(stateName, countryCode): string
+  Mapeo de nombres de cantones en 4 idiomas (DE, FR, IT, EN) a códigos
+- normalizeName(text): string — minúsculas, sin acentos, sin caracteres especiales
+- fetchWithTimeout(url, options, timeout): Promise<Response> — fetch con AbortController
+
+
+================================================================================
+
+=== PROMPT 15: ARCHIVO src/lib/geo.ts — RE-EXPORTS GEO-OSM + LEGACY ===
+
+ARCHIVO: /home/z/my-project/src/lib/geo.ts
+
+Re-exporta todo de geo-osm + funciones legacy para compatibilidad.
+
+EXPORTS desde geo-osm:
+geocodeAddress, reverseGeocode, calculateRoute, calculateDistanceMatrix,
+getBoundary, isPointInZone, isPointInPolygon, isLocationCoveredByZones,
+tipos: NominatimAddress, NominatimResult, GeocodedLocation, OSRMRoute, RouteInfo, OSMBoundary, DriverZone
+calculateStraightLineDistance
+
+FUNCIONES LEGACY (marcadas como @deprecated):
+- calculateDistance(lat1, lng1, lat2, lng2): alias de calculateStraightLineDistance
+- CITY_COORDINATES: mismas coordenadas que geo-osm
+- CANTON_CENTERS: centros de 5 cantones principales con avgRadius
+- CITY_TO_CANTON: mapeo ciudad → código cantón
+- getCityCoordinates(cityName, cantonCode?): fallback CITY_COORDINATES
+- findNearestCity(lat, lng): ciudad más cercana bajo 100km
+- getCantonFromCoords(lat, lng): código cantón por ciudad más cercana
+- extractCantonCode(zoneName): extraer código de cantón de texto
+- estimateTripPrice(distanceKm, basePrice=5, pricePerKm=2.5): estimación de precio
+- driverCoversLocation(driver, targetCity, targetCantonCode, targetCountry, serviceZones, mode)
+- hybridDriverMatch() — deprecated, retorna { matches: false }
+
+TIPOS LEGACY:
+- HybridMatchResult { matches, block?, reason, priority, distanceToOrigin?, marker? }
+- DriverForMatching { id, name, city, canton, coords, zones, routes, ... }
+- SearchLocation { name, cantonCode?, country?, postalCode?, lat?, lon? }
+
+
+================================================================================
+
+=== PROMPT 16: ARCHIVO src/lib/geo-data.ts (~1885 líneas) ===
+
+ARCHIVO: /home/z/my-project/src/lib/geo-data.ts
+
+Datos geográficos completos de Suiza y Liechtenstein.
+
+ESTRUCTURA:
+
+1. SWISS_CANTONS: Array de 26 cantones suizos + Liechtenstein
+   Cada cantón: { code, name, nameDE, nameFR, nameIT, districts: District[] }
+   District: { name, nameDE?, municipalities: string[] }
+
+   CANTONES: ZH (Zürich), BE (Bern), LU (Luzern), UR (Uri), SZ (Schwyz),
+   OW (Obwalden), NW (Nidwalden), GL (Glarus), ZG (Zug), FR (Freiburg/Fribourg),
+   SO (Solothurn), BS (Basel-Stadt), BL (Basel-Landschaft), SH (Schaffhausen),
+   AR (Appenzell A.Rh.), AI (Appenzell I.Rh.), SG (St. Gallen), GR (Graubünden),
+   AG (Aargau), TG (Thurgau), TI (Ticino), VD (Vaud), VS (Valais),
+   NE (Neuchâtel), GE (Genève), JU (Jura), LI (Liechtenstein)
+
+   Cada cantón tiene sus distritos con municipios (~2100 municipios total).
+
+2. POPULAR_PLACES: Lugares populares por cantón
+   Array de: { canton, name, type, lat, lng }
+   Tipos: airport, train_station, hospital, shopping, university
+   Ejemplos: Flughafen Zürich, Aéroport de Genève, EuroAirport Basel,
+   Hauptbahnhof Bern, etc.
+
+3. Funciones helper:
+   - getCantonData(code): Canton | undefined
+   - getCantonName(code, lang?): string
+   - getDistricts(cantonCode): District[]
+   - getMunicipalities(cantonCode): string[]
+   - isMunicipalityInCanton(municipality, cantonCode): boolean
+
+NOTA: Este archivo es estático (datos hardcodeados). No hace llamadas a APIs.
+Se usa como fallback y para validaciones rápidas.
+
+
+================================================================================
+
+=== PROMPT 17: ARCHIVO src/lib/searchTranslations.ts ===
+
+ARCHIVO: /home/z/my-project/src/lib/searchTranslations.ts
+
+Sistema de traducción y expansión de términos de búsqueda.
+
+EXPORTS:
+
+1. airportAliases: Record<string, string>
+   Mapeo de aliases para aeropuertos en 4 idiomas:
+   - 'zurich airport' → 'Flughafen Zürich'
+   - 'geneva airport' → 'Aéroport de Genève'
+   - 'basel airport' → 'EuroAirport Basel'
+   - Incluye variaciones: aeropuerto, flughafen, aéroport, ZRH, GVA, BSL, etc.
+
+2. expandSearchWithTranslations(query): { expandedQueries: string[], translatedTerms: string[] }
+   - Busca términos traducibles en el query
+   - Por cada término, genera queries alternativas en otros idiomas
+   - Ejemplo: 'aeropuerto zurich' → ['aeropuerto zurich', 'flughafen zurich',
+     'airport zurich', 'aéroport zurich']
+
+3. genericTranslations: Record<string, string[]>
+   Términos genéricos con traducciones:
+   - 'aeropuerto' ↔ 'flughafen' ↔ 'airport' ↔ 'aéroport' ↔ 'aeroporto'
+   - 'estación' ↔ 'bahnhof' ↔ 'station' ↔ 'gare'
+   - 'hospital' ↔ 'spital' ↔ 'krankenhaus' ↔ 'hôpital'
+   - 'farmacia' ↔ 'apotheke' ↔ 'pharmacy' ↔ 'pharmacie'
+   - 'gasolinera' ↔ 'tankstelle' ↔ 'gas station' ↔ 'fuel'
+   - 'centro' ↔ 'zentrum' ↔ 'center' ↔ 'centre'
+
+
+================================================================================
+
+=== PROMPT 18: ARCHIVO src/lib/swiss-municipalities.ts ===
+
+ARCHIVO: /home/z/my-project/src/lib/swiss-municipalities.ts
+
+Datos de municipios suizos organizados por cantón.
+
+EXPORTS:
+
+1. MUNICIPALITIES_BY_CANTON: Record<string, string[]>
+   - Clave: código de cantón en MAYÚSCULAS (ZH, BE, LU, etc.)
+   - Valor: array de nombres de municipios
+   - Ejemplo: ZH: ['Zürich', 'Winterthur', 'Uster', 'Dübendorf', ...]
+   - LI (Liechtenstein): ['Vaduz', 'Schaan', 'Balzers', 'Triesen', ...]
+   - Total: ~2100 municipios
+
+2. LIECHTENSTEIN_MUNICIPALITIES: string[]
+   - Los 11 municipios de Liechtenstein
+
+3. DISTRICTS_BY_CANTON: Record<string, Array<{ name, nameDE?, municipalities: string[] }>>
+   - Clave: código de cantón
+   - Valor: array de distritos con sus municipios
+   - Ejemplo: SG: [{ name: 'Rheintal', nameDE: 'Rheintal', municipalities: [...] }, ...]
+
+4. TOTAL_MUNICIPALITIES: number (constante, ~2100)
+
+
+================================================================================
+
+=== PROMPT 19: ARCHIVO src/lib/postal-codes-map.ts ===
+
+ARCHIVO: /home/z/my-project/src/lib/postal-codes-map.ts
+
+Mapeo de códigos postales suizos a ciudades.
+
+EXPORTS:
+
+1. POSTAL_CODE_MAP: Record<string, { city: string; canton: string; cantonCode: string }>
+   - Clave: código postal (string, ej: '8001', '3000', '9000')
+   - Valor: { city: 'Zürich', canton: 'Zürich', cantonCode: 'ZH' }
+   - Contiene los códigos postales principales de Suiza y Liechtenstein
+
+2. LI_POSTAL_CODES: Record<string, string>
+   - Códigos postales de Liechtenstein: { '9490': 'Vaduz', '9491': 'Schaan', ... }
+
+3. getCityForPostalCode(code): { city, canton, cantonCode } | null
+   - Busca en POSTAL_CODE_MAP, retorna null si no existe
+
+4. getAllPostalCodesForCity(cityName): string[]
+   - Retorna todos los códigos postales asociados a una ciudad
+
+
+================================================================================
+
+=== PROMPT 20: ARCHIVO src/app/api/geocode/route.ts ===
+
+API de geocodificación directa.
+
+GET /api/geocode?q={query}&countrycodes={codes}
+
+Parámetros:
+- q: texto a geocodificar (requerido)
+- countrycodes: códigos de país (default: 'ch,li')
+
+Respuesta:
+{ success: true, data: GeocodedLocation[] }
+
+Implementación: usa geocodeAddress() de geo-osm.ts
+
+
+================================================================================
+
+=== PROMPT 21: ARCHIVO src/app/api/reverse/route.ts ===
+
+API de geocodificación inversa con cache.
+
+GET /api/reverse?lat={lat}&lon={lon}
+
+Parámetros:
+- lat: latitud (requerido)
+- lon: longitud (requerido)
+
+Respuesta:
+{ success: true, data: GeocodedLocation }
+
+Implementación:
+1. Verificar cache primero (getCached)
+2. Si no hay cache → reverseGeocode() de geo-osm.ts
+3. Guardar resultado en cache (30 min)
+4. Retorna ubicación o error
+
+
+================================================================================
+
+=== PROMPT 22: ARCHIVO src/app/api/locations/route.ts (~770 líneas) ===
+
+API PRINCIPAL de autocompletado de direcciones. La más compleja.
+
+GET /api/locations?q={query}&lat={lat}&lon={lon}&limit={n}
+
+Este endpoint combina DOS APIs de geocodificación y aplica scoring:
+
+FLUJO DE BÚSQUEDA:
+
+1. Recibir query y parámetros
+2. Si query < 2 caracteres → retornar vacío
+3. Expandir búsqueda con traducciones (expandSearchWithTranslations)
+4. Llamar Photon API Y Nominatim EN PARALELO (Promise.all)
+
+PHOTON API:
+- URL: https://photon.komoot.io/api/?q={query}&limit=10&lang=de
+- User-Agent: EiTaxi/1.0
+
+NOMINATIM API:
+- URL: https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=10&addressdetails=1&countrycodes=ch,li
+- User-Agent: EiTaxi/1.0
+
+5. Combinar resultados de ambas APIs
+6. Para cada resultado, determinar tipo de POI:
+   - Aeropuertos (airport, aerodrome)
+   - Estaciones de tren (train_station, railway)
+   - Hospitales (hospital, clinic)
+   - Gasolineras (fuel, gas_station)
+   - Farmacias (pharmacy)
+   - Hoteles (hotel, hostel)
+   - Restaurantes (restaurant, cafe)
+   - Compras (supermarket, shopping)
+7. Calcular score de relevancia:
+   - Coincidencia exacta del nombre: +50
+   - Comienza con el query: +30
+   - Contiene el query: +20
+   - En Suiza/Liechtenstein: +10
+   - Tipo relevante (aeropuerto, estación): +15
+   - Cercanía a coordenadas del usuario (si proporcionadas): +25
+8. Ordenar por score descendente
+9. Retornar top N resultados (default 8)
+
+TIPO DE RESPUESTA por resultado:
+{
+  id: string (place_id o generado),
+  name: string (nombre corto),
+  fullName: string (display_name),
+  type: 'city' | 'address' | 'airport' | 'train_station' | 'hospital' | ...,
+  lat: number, lon: number,
+  city: string, canton: string, cantonCode: string,
+  postalCode: string, country: string,
+  icon: string (emoji por tipo),
+}
+
+ICONOS POR TIPO:
+- 🏙️ city, 📍 address, ✈️ airport, 🚉 train_station,
+- 🏥 hospital, ⛽ fuel, 💊 pharmacy, 🏨 hotel, 🍽️ restaurant
+
+DETALLE DE POI DETECTION:
+Usa keywords en el nombre para detectar tipo:
+- airport/aeropuerto/flughafen/aéroport → 'airport'
+- bahnhof/gare/hauptbahnhof/station → 'train_station'
+- spital/hospital/hôpital/clinique → 'hospital'
+- tankstelle/fuel/gasolinera → 'fuel'
+- apotheke/pharmacy/farmacia → 'pharmacy'
+
+
+================================================================================
+
+=== PROMPT 23: ARCHIVO src/app/api/route/route.ts ===
+
+API de cálculo de ruta con OSRM.
+
+GET /api/route?originLat={lat}&originLon={lon}&destLat={lat}&destLon={lon}
+
+Parámetros: coordenadas de origen y destino (requeridas)
+
+Respuesta:
+{ success: true, data: { distanceKm, durationMin, durationFormatted, geometry } }
+
+Implementación:
+1. Usar calculateRoute() de geo-osm.ts con profile='car'
+2. OSRM URL: /route/v1/car/{lon},{lat};{lon},{lat}?overview=full&geometries=polyline
+3. Decodificar polyline para la geometría
+4. Calcular distancia (km) y duración (minutos)
+
+
+================================================================================
+
+=== PROMPT 24: ARCHIVO src/app/api/route/calculate/route.ts ===
+
+API de estimación de distancia y precio.
+
+GET /api/route/calculate?originLat={lat}&originLon={lon}&destLat={lat}&destLon={lon}
+
+Parámetros: coordenadas de origen y destino
+
+Respuesta:
+{
+  success: true,
+  data: {
+    distanceKm, durationMin, durationFormatted,
+    estimatedPrice: { min, max, breakdown },
+    geometry
+  }
+}
+
+Estimación de precio:
+- basePrice default: CHF 5.00
+- pricePerKm default: CHF 2.50
+- calculated = basePrice + (distanceKm × pricePerKm)
+- min = round(calculated)
+- max = round(calculated × 1.15)
+- breakdown: "Base: CHF 5.00 + 12.3 km × CHF 2.50/km"
+
+
+================================================================================
+
+=== PROMPT 25: ARCHIVO src/app/api/search/route.ts ===
+
+API de búsqueda general.
+
+GET /api/search?q={query}&type={type}&limit={n}
+
+Parámetros:
+- q: término de búsqueda
+- type: 'driver' | 'city' | 'location'
+- limit: máximo resultados (default 20)
+
+Respuesta según tipo:
+- driver: lista de conductores que coincidan
+- city: lista de ciudades
+- location: lista de ubicaciones
+
+
+================================================================================
+
+=== PROMPT 26: ARCHIVO src/app/api/nearby/route.ts ===
+
+API de búsqueda de POIs cercanos.
+
+GET /api/nearby?lat={lat}&lon={lon}&type={type}&radius={m}
+
+Parámetros:
+- lat, lon: coordenadas del centro
+- type: 'gas' | 'pharmacy' | 'hospital' | 'hotel' | 'restaurant'
+- radius: radio en metros (default: 2000)
+
+Respuesta: { success: true, data: POI[] }
+
+Usa Nominatim con parámetro q={type keywords} y viewbox
+
+
+================================================================================
+
+=== PROMPT 27: ARCHIVO src/app/api/postal-codes/route.ts ===
+
+API de códigos postales suizos.
+
+GET /api/postal-codes?q={query}&canton={code}
+
+Parámetros:
+- q: código postal o nombre de ciudad
+- canton: filtrar por cantón
+
+Respuesta: { success: true, data: PostalCodeResult[] }
+
+
+================================================================================
+
+=== PROMPT 28: ARCHIVO src/app/api/cantons/route.ts ===
+
+API de lista de cantones con cache.
+
+GET /api/cantons
+
+Respuesta:
+{
+  success: true,
+  data: Array<{
+    code, name, slug, country, driverCount
+  }>
+}
+
+Implementación:
+1. Verificar cache (getCached con key 'cantons-list', TTL 1 hora)
+2. Si no hay cache:
+   a. Query todos los cantones
+   b. Para cada cantón, contar conductores activos
+   c. Guardar en cache
+3. Retornar lista ordenada por driverCount descendente
+
+
+================================================================================
+
+=== PROMPT 29: ARCHIVO src/app/login/page.tsx ===
+
+Página de login para conductores.
+
+ESTADO:
+- email, password: string
+- loading, error: boolean/string
+- showPassword: boolean
+
+FUNCIONALIDAD:
+- Formulario con email y contraseña
+- Validación básica (email no vacío, password > 6 chars)
+- Toggle de visibilidad de contraseña
+- Link a /recuperar-password
+- Link a /registrarse
+- Botón de login → POST /api/auth/login
+- On success: guardar sesión en localStorage (eitaxi_session),
+  redirigir a /dashboard/{driverId} o a redirect param
+- Credenciales demo: mostrar en modo desarrollo
+- Diseño: centrado, card con shadow, logo arriba, inputs con iconos
+
+
+================================================================================
+
+=== PROMPT 30: ARCHIVO src/app/recuperar-password/page.tsx ===
+
+Página de solicitud de recuperación de contraseña.
+
+FUNCIONALIDAD:
+- Formulario con email
+- POST /api/auth/reset-password (sin token)
+- Si email existe → enviar email con link de reset
+- Mensaje: "Si el email existe, recibirás un enlace de recuperación"
+- Link a /login
+
+
+================================================================================
+
+=== PROMPT 31: ARCHIVO src/app/restablecer-password/[token]/page.tsx ===
+
+Página de restablecimiento de contraseña.
+
+FUNCIONALIDAD:
+- Recibir token de la URL
+- GET /api/auth/reset-password?token={token} → verificar token válido
+- Formulario: nueva contraseña + confirmación
+- Validación: mínimo 8 caracteres, coincidencia
+- PUT /api/auth/reset-password con token y nueva password
+- On success: redirigir a /login con mensaje de éxito
+
+
+================================================================================
+
+=== PROMPT 32: ARCHIVO src/app/api/auth/login/route.ts ===
+
+API de login para conductores.
+
+POST /api/auth/login
+Body: { email: string, password: string }
+
+Implementación:
+1. Buscar conductor por email (toLowerCase)
+2. Verificar contraseña con bcrypt.compare
+3. Crear session JWT con createSessionToken({ id, email, name })
+4. Establecer cookie HTTP-only con sessionToken
+5. Retornar datos del conductor (sin password) + profileUrl
+
+Respuesta:
+{ success: true, data: { ...driverWithoutPassword, services, routes, languages, serviceZones, workingHours }, profileUrl }
+
+
+================================================================================
+
+=== PROMPT 33: ARCHIVO src/app/api/auth/logout/route.ts ===
+
+API de logout.
+
+POST /api/auth/logout
+
+Implementación:
+1. Crear respuesta
+2. Borrar cookie SESSION_COOKIE_NAME
+3. Retornar { success: true }
+
+
+================================================================================
+
+=== PROMPT 34: ARCHIVO src/app/api/auth/session/route.ts ===
+
+API de verificación de sesión.
+
+GET /api/auth/session
+
+Implementación:
+1. getServerSession() de auth.ts
+2. Si hay sesión → buscar conductor completo en BD
+3. Retornar datos del conductor o { success: false, authenticated: false }
+
+
+================================================================================
+
+=== PROMPT 35: ARCHIVO src/app/api/auth/reset-password/route.ts ===
+
+API de reset de contraseña (3 métodos).
+
+GET /api/auth/reset-password?token={token}
+- Verificar que el token no haya expirado (24 horas)
+- Buscar conductor por email almacenado en el token
+
+POST /api/auth/reset-password
+Body: { email: string }
+- Generar token de reset (JWT con expiración 24h)
+- Almacenar temporalmente o usar token verificable
+- Enviar email con link de reset (usando Resend)
+
+PUT /api/auth/reset-password
+Body: { token: string, password: string }
+- Verificar token válido
+- Hash nueva contraseña con bcrypt
+- Actualizar contraseña en BD
+- Retornar { success: true }
+
+
+================================================================================
+
+=== PROMPT 36: ARCHIVO src/app/registrarse/page.tsx (~2233 líneas) ===
+
+Página de registro de conductor en 8 pasos.
+
+COMPONENTE PRINCIPAL: RegistrationWizard
+
+ESTADO: Usa DriverFormContext (context centralizado)
+
+PASOS DEL WIZARD:
+
+PASO 1: DATOS BÁSICOS
+- Nombre completo (mínimo 2 caracteres)
+- Teléfono (mínimo 6 dígitos, formato suizo: +41 XXX XXX XX XX)
+- Email (validación: contiene @, sin caracteres especiales tipo ñ/á)
+- Contraseña (mínimo 8 caracteres, mostrar fortaleza)
+- Validación en tiempo real
+
+PASO 2: UBICACIÓN
+- Selector de cantón (dropdown con todos los cantones + Liechtenstein)
+- Selector de ciudad/municipio (filtered por cantón seleccionado)
+- Datos cargados de geo-data.ts (SWISS_CANTONS)
+- Al seleccionar cantón → filtrar ciudades del cantón
+
+PASO 3: VEHÍCULO
+- VehicleManager component (grid de tipos de vehículo)
+- Grid de 4 opciones: 🚕 Taxi, 🚗 Limusina, 🚐 Van/Minibus, ✨ Premium
+- Toggle para seleccionar uno o más tipos
+- Formulario para marca, modelo, año, color, capacidad
+- Vista previa del vehículo
+
+PASO 4: SERVICIOS E IDIOMAS
+- Grid de SERVICE_OPTIONS (8 servicios con toggle)
+- Grid de LANGUAGE_OPTIONS (8 idiomas con bandera y toggle)
+- Al menos un servicio requerido
+
+PASO 5: RUTAS, ZONAS Y PRECIOS
+- ZoneSelector component (jerárquico: País → Cantón → Distrito → Municipio)
+- Modo de zona: "pickup" (recogida) o "service" (destino)
+- Sistema de exclusiones (lugares que NO cubre)
+- AL MENOS UNA ZONA PICKUP REQUERIDA
+- FixedRoutesManager: rutas con precio fijo
+- Precios: base, por km, por hora
+
+PASO 6: HORARIOS
+- ScheduleSelector component
+- Toggle 24h (si true, no se configuran horarios)
+- Si false: 7 días con modo (cerrado/24h/específico)
+- Modo específico: múltiples franjas por día
+- Botón copiar horario a todos los días
+
+PASO 7: DESCRIPCIÓN AI
+- Botón "Generar descripción con IA"
+- Llama a /api/ai/generate-description
+- Parámetros: nombre, ciudad, canton, servicios, idiomas, vehículos
+- Muestra descripción generada con opción de editar
+- Contador de caracteres
+
+PASO 8: VISTA PREVIA
+- Vista previa completa del perfil
+- Foto de perfil (upload con crop circular)
+- Todos los datos en formato tarjeta
+- Checkbox: "Acepto los términos y condiciones" (link a /terminos)
+- Checkbox: "Acepto la política de privacidad" (link a /privacidad)
+- Botón "Crear perfil" → POST /api/drivers
+
+NAVIGATION:
+- Barra de progreso (1-8 pasos)
+- Botones: Anterior / Siguiente / Crear perfil
+- Validación por paso antes de avanzar
+- Indicador de pasos completados
+- On success: redirigir a /login con mensaje
+
+DISEÑO:
+- Max width: max-w-2xl
+- Cards con bg-card border-border
+- Inputs: bg-background border-border focus:border-yellow-400
+- Botón primario: bg-yellow-400 text-black
+- Step indicator con círculos numerados (completado: bg-green-500, actual: bg-yellow-400, futuro: bg-muted)
+
+
+================================================================================
+
+=== PROMPT 37: ARCHIVO src/app/dashboard/[driverId]/page.tsx (~2165 líneas) ===
+
+Dashboard completo del conductor con 8 pestañas.
+
+PROTECCIÓN: SessionGuard wrapper (verifica sesión antes de renderizar)
+
+ESTADO:
+- session from useSession()
+- formData from useDriverFormContext() (mode: 'edit')
+- activeTab: string
+- showPublicURL: boolean
+
+PESTAÑAS:
+
+TAB 1: INFORMACIÓN BÁSICA
+- Foto de perfil (upload, crop circular, preview)
+- Nombre, experiencia (años), teléfono
+- WhatsApp (checkbox auto-rellenar desde teléfono)
+- Email (solo lectura), dirección
+- Descripción (textarea con contador de caracteres)
+- Redes sociales: website, instagram, facebook
+- Botón "Generar descripción con IA"
+- Barra de progreso de completitud del perfil
+
+TAB 2: VEHÍCULOS
+- VehicleManager component
+- Lista de vehículos del conductor
+- CRUD: agregar, editar, eliminar vehículos
+- Marca, modelo, año, color, capacidad, matrícula
+- Marcar como primario
+
+TAB 3: SERVICIOS E IDIOMAS
+- Grid de SERVICE_OPTIONS con toggles (estado desde BD)
+- Grid de LANGUAGE_OPTIONS con toggles
+- Visual: tarjetas con icono/emoji, seleccionadas en yellow-400
+
+TAB 4: PRECIOS Y CALCULADORA
+- Campos: Precio base (CHF), Precio por km (CHF), Precio por hora (CHF)
+- Calculadora interactiva: input km → muestra precio estimado
+- Fórmula: base + (km × pricePerKm)
+
+TAB 5: HORARIOS
+- ScheduleSelector component
+- Toggle 24h
+- Si no 24h: tabla 7 días con franjas horarias
+
+TAB 6: ZONAS Y RUTAS
+- RoutesZonesManager component (tabs internos: Zonas + Rutas)
+- Zonas: ZoneSelector con modo pickup/service
+- Rutas: FixedRoutesManager con precios
+- Banner de warning si no hay zonas pickup configuradas
+
+TAB 7: GPS
+- GPSTracking component
+- Toggle GPS activo/inactivo
+- Estado: posición actual, última actualización
+- GPSReminder component (recordatorio full-screen)
+- Widget de GPS embebido
+
+TAB 8: PRIVACIDAD
+- DataManagement component (cumplimiento nDSG)
+- Exportar datos (genera JSON de todos los datos del perfil)
+- Eliminar cuenta (confirmación con 2 pasos)
+- Configuración de visibilidad
+
+BANNERS:
+1. GPS Reminder Banner (si GPS no activado): amarillo
+2. Zonas Warning Banner (si no hay zonas pickup): rojo
+3. Profile Completion Bar: verde/amarillo/rojo según %
+
+PROFILE URL: /{canton.slug}/{city.slug}/{driver.slug}
+
+FUNCIONES:
+- Guardar cambios → PUT /api/drivers (con requireAuth)
+- Logout → useSession().logout()
+- Estadísticas: vistas, contactos, valoración
+
+
+================================================================================
+
+=== PROMPT 38: ARCHIVO src/app/[canton]/[city]/[slug]/page.tsx (~819 líneas) ===
+
+Página pública del perfil del taxista.
+
+URL: /{canton-slug}/{city-slug}/{driver-slug}
+
+COMPONENTES:
+1. Header con foto de portada y perfil
+2. Info básica: nombre, ciudad, cantón, rating, experiencia
+3. Badges: verificado, top rated, 24/7, GPS activo
+4. Descripción
+5. Servicios (grid con iconos)
+6. Idiomas (banderas)
+7. Vehículos (tarjetas)
+8. Rutas populares con precios
+9. Zonas de servicio (listado)
+10. Horarios
+11. LiveMap (componente de mapa en tiempo real)
+12. ReviewsSection (estrellas + reviews)
+13. BookingModal (reserva)
+14. Botones de contacto: Llamar, WhatsApp
+
+DATOS: GET /api/drivers?slug={slug}&canton={canton}&city={city}
+- Incrementa contador de vistas automáticamente
+
+LIVEMAP:
+- Si GPS activo → mostrar posición en tiempo real con Leaflet
+- Actualización cada 5 segundos
+- Marcador con icono de taxi 🚕
+
+REVIEWS:
+- GET /api/reviews?driverId={id}
+- Mostrar rating promedio con estrellas
+- Formulario para nuevo review (POST /api/reviews)
+
+
+================================================================================
+
+=== PROMPT 39: ARCHIVO src/app/api/drivers/route.ts (~1046 líneas) ===
+
+API CRUD de conductores. Tres métodos HTTP.
+
+POST /api/drivers — REGISTRO
+Body completo: { name, phone, whatsapp, email, password, baseCanton, baseCity,
+  address, experience, description, originalDescription, services, languages,
+  serviceZones, serviceZonesWithExclusions, isAvailable24h, vehicleType,
+  vehicleTypes, vehicleBrand, vehicleModel, vehicleYear, vehicleColor,
+  passengerCapacity, imageUrl, basePrice, pricePerKm, hourlyRate, website,
+  instagram, facebook, routes, schedules, subscription, vehicles }
+
+Lógica:
+1. Validación detallada de campos requeridos (validateRequiredFields)
+2. Verificar email no duplicado
+3. Buscar/crear ciudad y cantón automáticamente
+4. Generar slug único (nombre normalizado + contador)
+5. Hash password con bcrypt (10 rounds)
+6. Auto-coverage: determineCoverageType() según cantón
+7. Auto-coords: getCityCoordinates() para lat/lon
+8. Crear TaxiDriver en BD con todos los campos
+9. Crear DriverRoutes, DriverServiceZones, Vehicles, DriverSchedules
+10. Retornar driver + profileUrl + coverageInfo
+
+GET /api/drivers — CONSULTA
+Parámetros: id, slug, canton, city, service, vehicleType, available24h, limit
+
+- Si id → GET por ID (para dashboard, con todas las relaciones)
+- Si slug → GET por slug (para perfil público, incrementa vistas)
+- Si no → LISTAR con filtros (para admin)
+
+PUT /api/drivers — ACTUALIZACIÓN (requiere auth)
+Body: { id, ...campos a actualizar }
+
+Lógica:
+1. requireAuth(request) → verificar sesión
+2. Verificar que id === session.driverId (ownership)
+3. Actualizar campos simples
+4. Actualizar campos JSON (services, languages, vehicleTypes)
+5. Actualizar workingHours (schedules como JSON)
+6. Reemplazar DriverServiceZones (deleteMany + create)
+7. Reemplazar DriverRoutes (deleteMany + createMany)
+8. Reemplazar DriverSchedules (deleteMany + create)
+
+
+================================================================================
+
+=== PROMPT 40: ARCHIVO src/app/api/taxis/route.ts ===
+
+API de listado de taxis públicos.
+
+GET /api/taxis?canton={slug}&city={slug}&service={id}&vehicleType={type}&available24h={bool}&limit={n}
+
+Implementación:
+1. Query con filtros where: { isActive: true, ...filters }
+2. Include: city, canton, driverRoutes, vehicles
+3. OrderBy: isTopRated desc, subscription desc, views desc
+4. Parsear JSON fields (services, languages, vehicleTypes)
+5. Filtrar por servicio en memoria (JSON field)
+6. Retornar { success, data, total }
+
+
+================================================================================
+
+=== PROMPT 41: ARCHIVO src/app/api/taxis/search/route.ts (~1400 líneas) ===
+
+MOTOR DE BÚSQUEDA PRINCIPAL — 10 REGLAS DE MATCHING.
+
+GET /api/taxis/search?originLat&originLon&destLat&destLon&originText&destText&passengers&vehicleType&services
+
+Este es el corazón del sistema de búsqueda. Implementa 10 reglas estrictas:
+
+CONFIGURACIÓN:
+- MAX_PICKUP_RADIUS_KM = 15
+- LONG_DISTANCE_THRESHOLD_KM = 50
+- MAX_PICKUP_ETA_MINUTES = 30
+- MAX_ETA_TO_TRIP_RATIO = 3
+- GPS_MAX_AGE_HOURS = 1
+- CACHE_TTL_MS = 30000
+
+REGLA 0: VERIFICACIÓN DE EXCLUSIÓN (VETO)
+- Verificar si origen o destino están en exclusiones del conductor
+- isLocationInExclusions() → si vetoed, DESCARTAR conductor
+- Prioridad absoluta: si hay exclusión, no importa nada más
+
+REGLA 1: VALIDACIÓN DE RECOGIDA (ORIGEN)
+- Verificar si origen está en zonas pickup del conductor
+- Fallback: verificar zonas de servicio
+- Si no → verificar GPS activo cerca (OSRM route o straight line < 15km)
+
+REGLA 2: VALIDACIÓN DE DESTINO
+- Verificar si destino está en zonas service del conductor
+- Fallback: verificar zonas pickup
+
+REGLA 3: LÓGICA CANTÓN VS DISTRITO
+- Si zona es tipo "canton" → aceptar cualquier ciudad del cantón
+  (usando equivalencias de nombres en DE/FR/IT/EN)
+- Si zona es tipo "district" → solo ciudades de ese distrito
+- CANTON_EQUIVALENCES: mapeo de nombres en 4 idiomas (GE↔Genève↔Geneva↔Ginebra↔Genf)
+
+REGLA 4: RUTAS POPULARES (BYPASS)
+- Si conductor tiene DriverRoute que coincide con origen+destino → BYPASS
+- Ignora todas las validaciones de zona
+- Prioridad máxima: ROUTE_BYPASS (nivel 5)
+
+REGLA 5: RADIO DE RECOGIDA DINÁMICO
+- Si viaje < 50km → verificar que ETA al origen ≤ 30 min
+- Regla de oro: ETA llegada ≤ 3 × duración del viaje
+- Si viaje ≥ 50km (larga distancia) → ignorar límite de radio
+
+REGLA 6: LÓGICA DE RETORNO (GPS MATCH)
+- Si GPS activo en zona que NO es base → destino cerca de BASE = Prioridad
+- Nivel RETURN_MATCH (nivel 3)
+
+REGLA 7: PRIORIDADES DE RESULTADOS
+- Nivel 5: Ruta Popular (BYPASS)
+- Nivel 4: Match Total (origen pickup + destino service)
+- Nivel 3: En Ruta de Vuelta (GPS + destino en zona base)
+- Nivel 2: Match Parcial (solo origen coincide con GPS cerca)
+- Nivel 1: Disponible Cerca (GPS activo cerca del origen)
+
+REGLA 8: FILTROS DE VEHÍCULO
+- Capacidad de pasajeros
+- Tipo de vehículo
+- Servicios requeridos
+
+REGLA 9: ETA Y DISTANCIA CON OSRM
+- Para cada match, calcular ruta OSRM conductor→origen y origen→destino
+- Incluir estimatedPrice basado en basePrice + pricePerKm del conductor
+
+REGLA 10: RESERVAS (PRE-BOOKING)
+- Parámetro scheduledFor → verificar horarios del conductor
+
+RESOLUCIÓN DE UBICACIÓN (resolveLocation):
+1. Si hay coordenadas directas → reverseGeocode
+2. Si hay ID de ciudad/cantón → buscar en BD
+3. Si hay texto → geocodeAddress
+
+CANTON_EQUIVALENCES (ejemplos):
+- GE: genève, geneve, geneva, ginebra, genf
+- ZH: zürich, zurich, zurigo
+- BE: bern, berne, berna
+- SG: st gallen, sankt gallen, san gallo
+- GR: graubünden, graubunden, grigioni, grisons
+- LI: liechtenstein
+
+TIPO SearchLocation:
+{ lat, lon, city, postalCode, canton, cantonCode, country, countryCode, displayName, boundingBox? }
+
+TIPO SearchResult:
+{ driver, priority, eta, distanceToOrigin, tripDistance, tripDuration, estimatedPrice: {min, max}, matchReason, zones: {pickup, service}, isReturnTrip?, routeBypass? }
+
+RESPUESTA:
+{ success: true, data: SearchResult[], meta: SearchMeta }
+
+
+================================================================================
+
+=== PROMPT 42: ARCHIVO src/app/api/taxis/live/route.ts ===
+
+API de descubrimiento GPS en tiempo real.
+
+GET /api/taxis/live?lat={lat}&lon={lon}&radius={km}
+
+Busca conductores con GPS activo (trackingEnabled=true, lastLocationAt < 1 hora)
+dentro del radio especificado (default: 50km).
+
+Respuesta: { success: true, data: LiveDriver[] }
+LiveDriver: { id, name, slug, currentLocation, lastLocationAt, vehicleType, ... }
+
+
+================================================================================
+
+=== PROMPT 43: ARCHIVO src/app/api/reviews/route.ts ===
+
+API de reviews (reseñas).
+
+GET /api/reviews?driverId={id}
+- Retorna todas las reviews aprobadas del conductor
+- OrderBy: createdAt desc
+
+POST /api/reviews
+Body: { driverId, rating (1-5), comment?, name?, tripRoute? }
+- Crear review (approved=true por defecto)
+- Rate limiting: máximo 1 review por IP/día
+- Actualizar rating promedio y reviewCount del conductor
+
+
+================================================================================
+
+=== PROMPT 44: ARCHIVO src/app/api/vehicles/route.ts ===
+
+API CRUD de vehículos.
+
+GET /api/vehicles?driverId={id}
+- Lista vehículos de un conductor
+
+POST /api/vehicles
+Body: { driverId, vehicleType, brand, model, year, color, passengerCapacity,
+  licensePlate, isPrimary }
+- Crear vehículo (requiere auth, ownership)
+
+PUT /api/vehicles
+Body: { id, ...campos }
+- Actualizar vehículo (requiere auth, ownership)
+
+DELETE /api/vehicles?id={id}
+- Eliminar vehículo (requiere auth, ownership)
+
+
+================================================================================
+
+=== PROMPT 45-51: APIs /api/driver/* ===
+
+45. /api/driver/location (POST)
+  Body: { driverId, latitude, longitude }
+  - Crear DriverLocation (almacenar posición GPS)
+  - Actualizar lastLocationAt del conductor
+  - Verificar auth o permitir con driverId (para GPS widget)
+
+46. /api/driver/location/[id] (GET)
+  - Obtener última ubicación de un conductor
+  - Retorna la ubicación más reciente de DriverLocation
+
+47. /api/driver/routes (GET/POST)
+  - GET: listar rutas de un conductor (?driverId={id})
+  - POST: crear ruta (?driverId, { origin, destination, price })
+
+48. /api/driver/security (GET)
+  - Requiere auth
+  - Retorna configuración de seguridad del conductor
+
+49. /api/driver/tracking (GET/PUT)
+  - GET: estado del tracking (?driverId={id})
+  - PUT: habilitar/deshabilitar tracking ({ driverId, enabled })
+
+50. /api/driver/zones (GET/POST/PUT)
+  - GET: listar zonas de servicio (?driverId={id})
+  - POST: crear zona
+  - PUT: actualizar zonas (reemplazar todas)
+
+51. /api/driver/data-export (GET)
+  - Requiere auth
+  - Genera JSON con TODOS los datos del conductor (GDPR/nDSG)
+  - Incluye: perfil, vehículos, rutas, zonas, horarios, reviews, ubicaciones
+
+52. /api/driver/delete-account (DELETE)
+  - Requiere auth
+  - Confirma con contraseña
+  - Elimina: vehículo, zonas, rutas, horarios, ubicaciones, reviews
+  - Elimina el conductor
+  - Borra cookies
+
+
+================================================================================
+
+=== PROMPT 52: ARCHIVO src/lib/gpsSync.ts ===
+
+Utilidad de sincronización GPS entre pestañas del navegador.
+
+EXPORTS:
+- GPSState: { active, position, lastUpdate, driverId }
+- subscribeToGPS(listener): () => void — suscribir a cambios GPS
+- broadcastGPSState(state): void — transmitir nuevo estado
+- readFromStorage(): GPSState | null — leer desde localStorage
+- cleanupGPSSync(): void — limpiar canal
+
+Implementación:
+1. BroadcastChannel API (nombre: 'eitaxi-gps-sync') como primario
+2. localStorage ('eitaxi-gps-state') como fallback para cross-tab sync
+3. window.addEventListener('storage') para detectar cambios en otras pestañas
+4. Patrón de listeners para notificar suscriptores
+
+
+================================================================================
+
+=== PROMPT 53: ARCHIVO src/contexts/GPSContext.tsx ===
+
+Contexto React para gestión de GPS.
+
+PROVIDER: GPSProvider({ driverId, children })
+
+ESTADO:
+- gpsActive: boolean
+- trackingEnabled: boolean
+- currentPosition: { lat, lng } | null
+- lastSent: Date | null
+- error: string | null
+
+ACCIONES:
+- toggleGPS(): async — activa/desactiva tracking
+- enableTracking(): async — habilita tracking en BD (PUT /api/driver/tracking)
+- refreshTrackingStatus(): async — lee estado desde BD
+
+FUNCIONAMIENTO INTERNO:
+1. navigator.geolocation.watchPosition() con enableHighAccuracy, timeout=10s, maxAge=5s
+2. Envío periódico: POST /api/driver/location cada 5 segundos
+3. Notificaciones nativas al activar/desactivar GPS
+4. Verificación HTTPS requerida
+5. Persistencia en localStorage: gps-active-{driverId}
+
+HOOK: useGPS() — retorna el contexto (debe usarse dentro de GPSProvider)
+
+
+================================================================================
+
+=== PROMPT 54: ARCHIVO src/components/GPSProvider.tsx ===
+
+Componente wrapper que envuelve el GPSProvider en nivel de layout.
+Usado en dashboard y widget para auto-iniciar GPS si estaba activo.
+
+
+================================================================================
+
+=== PROMPT 55: ARCHIVO src/components/GPSTracking.tsx ===
+
+Panel de gestión GPS para el dashboard.
+
+FUNCIONALIDADES:
+- Toggle GPS on/off
+- Estado actual: activo/inactivo, posición, última actualización
+- Configuración: modo de tracking (always/schedule), horarios
+- Mapa miniatura con posición actual
+- Estadísticas: tiempo activo, distancia recorrida (estimada)
+- Botón de test de ubicación
+
+
+================================================================================
+
+=== PROMPT 56: ARCHIVO src/components/GPSFloatingButton.tsx ===
+
+Botón flotante de acción para GPS.
+
+- Posición: bottom-right fija
+- Color: green-500 cuando activo, gray cuando inactivo
+- Icono: MapPin
+- Animación de pulso cuando activo
+- Click → toggleGPS()
+
+
+================================================================================
+
+=== PROMPT 57: ARCHIVO src/components/GPSReminder.tsx ===
+
+Recordatorio full-screen para activar GPS.
+
+- Se muestra cada X minutos (configurable)
+- Modal centrado con fondo semi-transparente
+- Mensaje: "Activa tu GPS para recibir más solicitudes"
+- Botones: "Activar GPS" / "Ahora no"
+- Al activar → hide por 1 hora
+- Usa localStorage: gps-reminder-interval
+
+
+================================================================================
+
+=== PROMPT 58-63: PÁGINAS Y MAPAS GPS ===
+
+58. /gps/page.tsx — Página principal GPS (lista de conductores con GPS activo)
+
+59. /gps/[driverId]/page.tsx — Página GPS individual
+    - LocationMap component (mapa Leaflet con marcador de posición)
+
+60. /gps-quick/page.tsx — GPS rápido (widget-like)
+    - Simplificado para acceso rápido
+
+61. /track/[driverId]/page.tsx — Página de seguimiento público
+    - TrackingMap component (polilínea de ruta)
+    - TaxiTrackingMap component (posición del taxi)
+
+62. COMPONENTES DE MAPA:
+    - RouteMap (src/app/RouteMap.tsx): Mapa con ruta OSRM entre 2 puntos
+      - Decode polyline
+      - Marcadores: verde (origen), rojo (destino)
+      - Auto-fit bounds
+      - Dark theme tiles
+
+    - LocationMap (src/app/gps/[driverId]/LocationMap.tsx):
+      - Mapa centrado en la posición del conductor
+      - Marcador con icono de taxi
+      - Círculo de precisión
+
+    - TrackingMap (src/app/track/[driverId]/TrackingMap.tsx):
+      - Mapa con última ubicación conocida
+      - Polilínea si hay historia de ubicaciones
+
+    - TaxiTrackingMap (src/app/track/[driverId]/TaxiTrackingMap.tsx):
+      - Mapa centrado en posición del taxi
+      - Icono de taxi animado
+      - Auto-refresh cada 10 segundos
+
+    - LiveMap (src/app/[canton]/[city]/[slug]/LiveMap.tsx):
+      - Mapa en tiempo real del perfil del taxista
+      - Solo se muestra si trackingEnabled
+      - Marcador taxi 🚕 con pulso animado
+      - Dark theme
+
+    - LiveTaxiMap (src/components/LiveTaxiMap.tsx):
+      - Mapa global de taxis activos
+      - Muestra todos los conductores con GPS activo
+      - Marcadores clusterizados
+      - Click en marcador → info del conductor
+
+TODOS LOS MAPAS USAN:
+- react-leaflet con TileLayer de OpenStreetMap
+- Dark theme: tiles de CartoDB dark_all o similar
+- Marcadores custom con divIcon
+- Auto-fit bounds cuando hay múltiples puntos
+
+
+================================================================================
+
+=== PROMPT 64: ARCHIVO src/components/SessionGuard.tsx ===
+
+Guardia de autenticación para proteger páginas.
+
+"use client"
+Props: { children: React.ReactNode }
+
+FUNCIONAMIENTO:
+1. useSession() para verificar sesión
+2. Si no hay sesión → redirigir a /login
+3. Si loading → mostrar spinner
+4. Si hay sesión → renderizar children
+
+
+================================================================================
+
+=== PROMPT 65: ARCHIVO src/components/VehicleManager.tsx (~693 líneas) ===
+
+Gestión CRUD de vehículos del conductor.
+
+ESTADO:
+- vehicles: Vehicle[]
+- showForm: boolean
+- editingVehicle: Vehicle | null
+- formData: { vehicleType, brand, model, year, color, passengerCapacity, licensePlate }
+
+FUNCIONALIDADES:
+- Grid de 4 tipos: 🚕 Taxi, 🚗 Limusina, 🚐 Van/Minibus, ✨ Premium
+- Toggle de tipo (selección múltiple)
+- Formulario de detalles: marca, modelo, año, color, capacidad, matrícula
+- Lista de vehículos existentes con botón editar/eliminar
+- Marcar como primario
+- Integración con DriverFormContext
+
+API:
+- GET /api/vehicles?driverId={id}
+- POST /api/vehicles
+- PUT /api/vehicles
+- DELETE /api/vehicles?id={id}
+
+
+================================================================================
+
+=== PROMPT 66: ARCHIVO src/components/ScheduleSelector.tsx (~645 líneas) ===
+
+Selector de horarios multiranura.
+
+PROPS: { value: DaySchedule[], onChange }
+
+TIPO DaySchedule:
+{ dayOfWeek: number, mode: 'closed' | 'all_day' | 'specific', slots: TimeSlot[] }
+TimeSlot: { id: string, startTime: string, endTime: string }
+
+FUNCIONALIDADES:
+- Toggle 24h (si activo, todos los días en all_day)
+- 7 filas (Lun-Dom) con selector de modo
+- Modo 'specific': múltiples franjas horarias por día
+- Botón agregar franja (+)
+- Botón eliminar franja (×)
+- Inputs time para startTime y endTime
+- Botón "Copiar a todos los días"
+- Integración con DriverFormContext (updateSchedule, setDayMode, addSlot, removeSlot)
+
+
+================================================================================
+
+=== PROMPT 67: ARCHIVO src/components/ZoneSelector.tsx (~1150 líneas) ===
+
+Selector jerárquico de zonas de servicio con exclusiones.
+
+PROPS: { value: NormalizedServiceZone[], onChange }
+
+ESTADO INTERNO:
+- expandedCanton: string | null
+- expandedDistrict: string | null
+- searchQuery: string
+- showExclusions: Record<string, boolean>
+
+FUNCIONALIDADES:
+
+1. JERARQUÍA DE SELECCIÓN:
+   Nivel 1: País (Suiza, Liechtenstein)
+   Nivel 2: Cantón (26 cantones suizos + LI)
+   Nivel 3: Distrito (subdivisiones del cantón)
+   Nivel 4: Municipio (ciudades del distrito)
+
+2. MODO DE ZONA:
+   - "pickup" (recogida): donde el conductor recoge al cliente
+   - "service" (destino): donde el conductor lleva al cliente
+
+3. EXCLUSIONES:
+   - Por cada zona seleccionada, botón "Excluir lugares"
+   - Input para agregar municipio a excluir
+   - Lista de exclusiones con botón eliminar
+   - Las exclusiones tienen PRIORIDAD ABSOLUTA en el motor de búsqueda
+
+4. SEARCH:
+   - Input de búsqueda para filtrar municipios
+   - Búsqueda instantánea mientras escribe
+
+5. VISUAL:
+   - Accordion: cantón → distrito → municipios
+   - Checkboxes para cada nivel
+   - Badge con contador de zonas seleccionadas
+   - Colores: pickup=blue-500, service=green-500
+   - Exclusiones en red-500
+
+6. DATOS:
+   - Cantones y municipios de geo-data.ts y swiss-municipalities.ts
+   - DISTRICTS_BY_CANTON de swiss-municipalities.ts
+
+TIPO NormalizedServiceZone:
+{ id?, zoneName, zoneType, zoneMode: 'pickup'|'service',
+  exclusions: string[], boundingBox?, centerLat?, centerLon?, osmId? }
+
+
+================================================================================
+
+=== PROMPT 68: ARCHIVO src/components/RoutesZonesManager.tsx ===
+
+Manager combinado de zonas y rutas con tabs internos.
+
+PROPS: { driverId, zones, routes, onUpdate }
+
+TABS INTERNOS:
+1. "Zonas de Servicio" → ZoneSelector component
+2. "Rutas Fijas" → FixedRoutesManager component
+
+FUNCIONALIDADES:
+- Tabs con shadcn/ui Tabs component
+- Sincronización con DriverFormContext
+- Contador de zonas/rutas en el tab label
+
+
+================================================================================
+
+=== PROMPT 69: ARCHIVO src/components/FixedRoutesManager.tsx (~624 líneas) ===
+
+Gestión de rutas con precio fijo.
+
+FUNCIONALIDADES:
+- Lista de rutas existentes del conductor
+- Formulario para agregar nueva ruta:
+  - Origen (input + PlaceSearch autocomplete)
+  - Destino (input + PlaceSearch autocomplete)
+  - Precio (CHF, opcional)
+- Al ingresar origen+destino → calcular distancia con OSRM
+- Mostrar distancia estimada
+- Botón guardar → crear DriverRoute
+- Botón eliminar ruta
+- Toggle activa/inactiva
+
+
+================================================================================
+
+=== PROMPT 70: ARCHIVO src/components/PlaceSearch.tsx ===
+
+Autocompletado de lugares con Nominatim.
+
+PROPS: { value, onChange, placeholder? }
+
+FUNCIONALIDADES:
+- Input con debounce (300ms)
+- Dropdown con resultados de /api/locations?q=
+- Cada resultado: icono + nombre + cantón
+- Click → seleccionar y cerrar dropdown
+- Limpiar con botón ×
+
+
+================================================================================
+
+=== PROMPT 71: ARCHIVO src/components/LiveTaxiMap.tsx ===
+
+Mapa en tiempo real de taxis cercanos.
+
+FUNCIONALIDADES:
+- Mapa Leaflet con dark theme
+- Marcadores para cada taxi con GPS activo
+- Iconos custom con color según tipo de vehículo
+- Popup con info del conductor al hacer click
+- Auto-fit bounds
+- Refresh cada 10 segundos
+- API: GET /api/taxis/live?lat&lon&radius
+
+
+================================================================================
+
+=== PROMPT 72: ARCHIVO src/components/ReviewsSection.tsx ===
+
+Sección de reseñas con estrellas.
+
+PROPS: { driverId }
+
+FUNCIONALIDADES:
+- Rating promedio con estrellas visuales (1-5)
+- Total de reviews
+- Lista de reviews: nombre, fecha, rating, comentario, ruta
+- Formulario para nuevo review:
+  - Rating (selector de estrellas interactivo)
+  - Nombre (opcional)
+  - Ruta del viaje (opcional)
+  - Comentario (textarea)
+  - Botón enviar → POST /api/reviews
+- Animación de entrada con Framer Motion
+
+
+================================================================================
+
+=== PROMPT 73: ARCHIVO src/components/DataManagement.tsx ===
+
+Componente de gestión de datos (cumplimiento nDSG/GDPR).
+
+PROPS: { driverId }
+
+FUNCIONALIDADES:
+1. EXPORTAR DATOS:
+   - Botón "Exportar mis datos"
+   - GET /api/driver/data-export
+   - Descargar como JSON
+
+2. ELIMINAR CUENTA:
+   - Botón "Eliminar mi cuenta"
+   - Confirmación: escribir "ELIMINAR" para confirmar
+   - Segunda confirmación: ingresar contraseña
+   - DELETE /api/driver/delete-account
+   - On success: logout y redirigir a /
+
+3. VISIBILIDAD:
+   - Toggle perfil público/privado
+   - Toggle mostrar teléfono
+
+
+================================================================================
+
+=== PROMPT 74: ARCHIVO src/components/PWAInstallPrompt.tsx ===
+
+Prompt de instalación PWA.
+
+FUNCIONALIDADES:
+- Detecta si la app es instalable (beforeinstallprompt event)
+- Muestra banner discretamente después de 30 segundos
+- Botón "Instalar aplicación"
+- Botón cerrar (no mostrar más, guardar en localStorage)
+- Solo se muestra en mobile
+
+
+================================================================================
+
+=== PROMPT 75: ARCHIVO src/contexts/DriverFormContext.tsx (~931 líneas) ===
+
+Contexto centralizado para el formulario de conductor.
+
+USADO EN: Registro (create) y Dashboard (edit)
+
+TIPOS EXPORTADOS:
+- FormMode: 'create' | 'edit'
+- TimeSlot: { id, startTime, endTime }
+- DaySchedule: { dayOfWeek, mode, slots }
+- NormalizedServiceZone: { id?, zoneName, zoneType, zoneMode, exclusions, boundingBox?, ... }
+- DriverFormData: TODOS los campos del formulario (30+ campos)
+- DriverFormState: { mode, driverId, data, loading, saving, error, success, ... }
+- DriverFormAction: 16 tipos de acción (SET_MODE, SET_DATA, UPDATE_FIELD, ADD_ZONE, ...)
+
+PROVIDER: DriverFormProvider({ children, mode?, driverId?, initialData? })
+
+REDUCER: driverFormReducer(state, action) — maneja todas las acciones
+
+FUNCIONES DEL CONTEXT:
+- updateField(field, value): actualizar un campo específico
+- setData(partial): actualizar múltiples campos
+- addZone / removeZone / updateZone: gestión de zonas
+- updateSchedule: actualizar horario de un día
+- setImage(file, preview): subir imagen
+- setError / setSuccess: manejar estado
+- toggleService / toggleLanguage / toggleVehicleType: toggles
+- addRoute / removeRoute / updateRoute: gestión de rutas
+- setDayMode / addSlot / removeSlot / updateSlot: helpers de horarios
+- loadDriverData(driverId): cargar datos desde API
+- save(): guardar todo (POST o PUT según modo)
+- reset(): reiniciar formulario
+- hasChanges(): comparar con datos originales
+
+HOOK: useDriverFormContext() — alias: useDriverForm()
+
+
+================================================================================
+
+=== PROMPT 76: ARCHIVO src/lib/client-auth.ts ===
+
+Autenticación JWT para clientes (separada de conductores).
+
+SESSION_COOKIE_NAME = 'eitaxi_client_token'
+SESSION_MAX_AGE = 60 * 60 * 24 * 30 (30 días)
+
+Funciones idénticas a conductor-auth pero para Client:
+- createClientSessionToken(client)
+- verifyClientSessionToken(token)
+- getClientServerSession()
+- requireClientAuth(request)
+- clientSessionCookieOptions
+
+
+================================================================================
+
+=== PROMPT 77-81: APIs AUTH CLIENT ===
+
+77. /api/auth/client/login (POST)
+  Body: { email, password }
+  - Buscar Client por email
+  - bcrypt.compare password
+  - Crear JWT client token
+  - Establecer cookie eitaxi_client_token
+
+78. /api/auth/client/register (POST)
+  Body: { name, email, password, phone?, preferredLang? }
+  - Hash password
+  - Crear Client en BD
+  - Crear sesión JWT
+
+79. /api/auth/client/logout (POST)
+  - Borrar cookie eitaxi_client_token
+
+80. /api/auth/client/session (GET)
+  - Verificar sesión de cliente
+  - Retornar datos del cliente
+
+81. /api/auth/client/whoami (GET)
+  - Retornar { role: 'client', ...clientData }
+
+
+================================================================================
+
+=== PROMPT 82-83: APIs BOOKINGS ===
+
+82. /api/bookings (GET/POST)
+  GET: ?clientId={id} — lista reservas del cliente
+  POST: { clientId, driverId, pickupAddress, pickupLat, pickupLon,
+         destAddress?, destLat?, destLon?, scheduledFor?,
+         passengerCount, price?, notes? }
+  - Crear Booking en BD
+  - Notificar al conductor
+
+83. /api/client/bookings (GET/POST)
+  GET: reservas del cliente autenticado
+  POST: crear reserva (requiere auth client)
+
+
+================================================================================
+
+=== PROMPT 84-85: APIs CHAT ===
+
+84. /api/chat (GET/POST)
+  GET: ?bookingId={id} — mensajes de una reserva
+  POST: { bookingId, senderId, receiverId, senderType, content }
+  - Crear mensaje
+
+85. /api/chat/recent (GET)
+  ?driverId={id} — mensajes recientes para el conductor
+  - Últimos 50 mensajes no leídos
+
+
+================================================================================
+
+=== PROMPT 86: ARCHIVO src/app/api/client/notifications/route.ts ===
+
+GET: ?clientId={id} — notificaciones del cliente
+PUT: { id, isRead: true } — marcar como leída
+
+
+================================================================================
+
+=== PROMPT 87-88: LIBRERÍAS PUSH ===
+
+87. src/lib/notifications.ts
+  - sendPushNotification(subscription, payload): Promise<void>
+  - Usar web-push para enviar notificaciones push a clientes
+
+88. src/lib/push.ts
+  - sendDriverPushNotification(driverId, title, body): Promise<void>
+  - Buscar PushSubscription del conductor y enviar
+
+
+================================================================================
+
+=== PROMPT 89-91: APIs PUSH SUBSCRIBE ===
+
+89. /api/client/push-subscribe (POST)
+  Body: { clientId, endpoint, keys: { auth, p256dh } }
+  - Crear ClientPushSubscription
+
+90. /api/client/push/subscribe (POST)
+  - Idem, con auth de cliente
+
+91. /api/push/subscribe (POST)
+  Body: { driverId, endpoint, keys: { auth, p256dh } }
+  - Crear PushSubscription para conductor
+  - Requiere auth conductor
+
+
+================================================================================
+
+=== PROMPT 92: ARCHIVO src/app/cuenta/page.tsx (~926 líneas) ===
+
+Página de cuenta del cliente (login, registro, dashboard, chat, notificaciones).
+
+COMPONENTES INTERNOS:
+1. LoginForm — Email + contraseña + login
+2. RegisterForm — Nombre + email + contraseña + registro
+3. ClientDashboard — Reservas, estadísticas, perfil
+4. ChatPanel — Mensajes con conductores
+5. NotificationPanel — Notificaciones del sistema
+
+ESTADO:
+- view: 'login' | 'register' | 'dashboard'
+- activeSection: 'reservas' | 'perfil' | 'chat' | 'notificaciones'
+- client: Client | null
+
+FUNCIONALIDADES:
+- Login con email/password
+- Registro con nombre/email/password
+- Dashboard con:
+  - Lista de reservas (pendientes, activas, completadas)
+  - Estadísticas: total viajes, gastado
+  - Perfil: nombre, email, teléfono
+- Chat con conductores (por reserva)
+- Notificaciones con badge de no leídas
+- Botón cerrar sesión
+
+
+================================================================================
+
+=== PROMPT 93: ARCHIVO src/components/BookingModal.tsx (~367 líneas) ===
+
+Modal de reserva de taxi.
+
+PROPS: { driver: DriverResult, isOpen, onClose }
+
+FUNCIONALIDADES:
+- Formulario de reserva:
+  - Dirección de recogida (con autocompletado)
+  - Dirección de destino (con autocompletado)
+  - Fecha y hora programada (opcional)
+  - Número de pasajeros
+  - Notas adicionales
+- Botones: Cancelar, Reservar
+- POST /api/bookings
+- On success: mostrar confirmación, cerrar modal
+
+
+================================================================================
+
+=== PROMPT 94: ARCHIVO src/app/registro/page.tsx ===
+
+Landing page de registro para conductores.
+
+FUNCIONALIDADES:
+- Hero section: "Únete a Eitaxi"
+- Beneficios de registrarse
+- Botón CTA: "Comenzar registro" → /registrarse
+- Estadísticas: conductores, cantones, viajes
+
+
+================================================================================
+
+=== PROMPT 95: ARCHIVO src/components/CookieBanner.tsx ===
+
+Banner de consentimiento de cookies (GDPR).
+
+FUNCIONALIDADES:
+- Aparece la primera vez que visita el usuario
+- Texto: "Usamos cookies para mejorar tu experiencia..."
+- Botones: "Aceptar", "Rechazar", "Configurar"
+- Guardar preferencia en localStorage
+- No mostrar más si ya aceptó/rechazó
+
+
+================================================================================
+
+=== PROMPT 96: ARCHIVO src/components/ChatNotificationToast.tsx ===
+
+Notificación tipo WhatsApp para nuevos mensajes.
+
+FUNCIONALIDADES:
+- Toast con animación slide-in
+- Sonido de notificación (audio file)
+- Muestra: nombre del remitente + preview del mensaje
+- Auto-dismiss después de 5 segundos
+- Click → abre el chat
+
+
+================================================================================
+
+=== PROMPT 97: ARCHIVO src/app/api/auth/check/route.ts ===
+
+API de verificación universal de autenticación.
+
+GET /api/auth/check
+
+Verifica tanto conductor (eitaxi_session_token) como cliente (eitaxi_client_token).
+
+Respuesta:
+{ authenticated: boolean, role: 'driver' | 'client' | null, session?: {...} }
+
+
+================================================================================
+
+=== PROMPT 98: ARCHIVO src/app/api/auth/whoami/route.ts ===
+
+API de identidad completa.
+
+GET /api/auth/whoami
+
+Verifica conductor → cliente → retorna null.
+
+Respuesta:
+{ role: 'driver', driverId, name, email, ... }
+o { role: 'client', clientId, name, email, ... }
+o { role: null }
+
+
+================================================================================
+
+=== PROMPT 99: ARCHIVO src/app/api/admin/users/route.ts ===
+
+API de admin para listar usuarios.
+
+GET /api/admin/users?type={driver|client}&limit={n}
+
+- Requiere admin auth (header X-Admin-Secret)
+- Lista de usuarios con datos básicos
+- Paginación con cursor
+
+
+================================================================================
+
+=== PROMPT 100: ARCHIVO src/lib/email.ts (~810 líneas) ===
+
+Sistema de envío de emails con Resend.
+
+FUNCIONES:
+
+1. sendEmail({ to, subject, html, from? }): Promise<{ success, id? }>
+   - Usa Resend API (process.env.RESEND_API_KEY)
+   - From default: 'Eitaxi <noreply@eitaxi.ch>'
+   - Soporta HTML templates
+
+2. sendPasswordResetEmail(email, resetToken, resetUrl)
+   - Template HTML con diseño Eitaxi (dark theme, yellow accent)
+   - Botón de reset con link
+   - Texto en español
+   - Validez: 24 horas
+
+3. sendWelcomeEmail(driverName, profileUrl)
+   - Email de bienvenida al registrarse
+   - Links: perfil, dashboard, ayuda
+
+4. sendBookingConfirmationEmail(clientEmail, booking, driver)
+   - Confirmación de reserva
+   - Detalles: pickup, destino, fecha, precio
+
+5. sendReviewRequestEmail(clientEmail, driverName, bookingUrl)
+   - Solicitar review después del viaje
+
+TEMPLATES HTML:
+- Diseño responsive
+- Dark theme background (#1a1a2e)
+- Yellow accent (#facc15)
+- Logo como text/emoji
+- Botones estilizados
+
+
+================================================================================
+
+=== PROMPT 101: ARCHIVO src/lib/fastFetch.ts ===
+
+Fetch alternativo para Node.js (sin window.fetch en versiones antiguas).
+
+FUNCIONES:
+- fastFetch(url, options?): Promise<{ ok, status, json, text, headers }>
+- Usa http/https de Node.js
+- Timeout por defecto: 10 segundos
+- User-Agent: EiTaxi/1.0
+
+
+================================================================================
+
+=== PROMPT 102: ARCHIVO src/app/api/upload/route.ts ===
+
+API de subida de imágenes.
+
+POST /api/upload
+Body: FormData con campo "file"
+
+FUNCIONALIDAD:
+1. Recibir archivo del formData
+2. Validar tipo (image/jpeg, image/png, image/webp)
+3. Validar tamaño (máximo 5MB)
+4. Generar nombre único: driver-{timestamp}-{random}.png
+5. Guardar en /public/uploads/drivers/
+6. Procesar con sharp: resize a 400x400, formato JPEG calidad 80
+7. Retornar URL: /uploads/drivers/{filename}
+
+NOTA: Para producción, usar S3 o CDN en vez de /public
+
+
+================================================================================
+
+=== PROMPT 103: ARCHIVO src/app/api/ai/generate-description/route.ts ===
+
+API de generación de descripción con IA.
+
+POST /api/ai/generate-description
+Body: { name, city, canton, services, languages, vehicleTypes, experience }
+
+FUNCIONALIDAD:
+1. Usar z-ai-web-dev-sdk para generar descripción
+2. Prompt en español con contexto del conductor
+3. Generar descripción profesional de 2-3 párrafos
+4. Incluir: servicios ofrecidos, experiencia, idiomas, vehículos
+5. Retornar descripción como texto
+
+Respuesta: { success: true, description: string }
+
+
+================================================================================
+
+=== PROMPT 104: APIs CACHE ===
+
+GET /api/cache/clear
+- clearCache() de cache.ts
+- Retornar { success: true, message: 'Cache limpiado' }
+
+GET /api/cache/stats
+- getCacheStats() de cache.ts
+- Retornar { type, size, keys }
+
+
+================================================================================
+
+=== PROMPT 105: ARCHIVO src/app/api/warmup/route.ts ===
+
+API de pre-calentamiento de cache.
+
+GET /api/warmup
+
+FUNCIONALIDAD:
+1. warmupCache() de cache.ts
+2. Pre-cargar búsquedas frecuentes
+3. Retornar { success: true, warmed: number }
+
+
+================================================================================
+
+=== PROMPT 106: ARCHIVO src/app/privacidad/page.tsx (~517 líneas) ===
+
+Página de política de privacidad (cumplimiento nDSG suizo).
+
+SECCIONES:
+1. Información del responsable
+2. Datos que recopilamos (conductores, clientes, visitantes)
+3. Finalidad del tratamiento
+4. Base legal
+5. Transferencias internacionales
+6. Derechos del interesado (acceso, rectificación, supresión, portabilidad)
+7. Cookies y tecnologías similares
+8. Contacto
+
+DISEÑO:
+- max-w-3xl centrado
+- Tipografía: headings en yellow-400
+- Links internos a otras secciones
+
+
+================================================================================
+
+=== PROMPT 107: ARCHIVO src/app/terminos/page.tsx (~368 líneas) ===
+
+Página de términos y condiciones.
+
+SECCIONES:
+1. Aceptación de términos
+2. Descripción del servicio
+3. Registro y cuenta
+4. Obligaciones del conductor
+5. Tarifas y pagos
+6. Propiedad intelectual
+7. Responsabilidad
+8. Modificaciones
+9. Ley aplicable (Suiza)
+
+
+================================================================================
+
+=== PROMPT 108: ARCHIVO src/app/widget/page.tsx (~512 líneas) ===
+
+Página del widget GPS embebible.
+
+FUNCIONALIDADES:
+- Iframe embebible en sitios externos
+- GPS tracking simplificado
+- Login rápido
+- URL: /widget?driverId={id}
+- Manifest separado: manifest.json (para widget standalone)
+- Diseño minimalista: solo GPS + botones
+
+
+================================================================================
+
+=== PROMPT 109: ARCHIVOS i18n ===
+
+src/i18n/config.ts:
+\`\`\`typescript
+export const locales = ['es', 'de', 'en', 'fr', 'it', 'pt'] as const;
+export type Locale = (typeof locales)[number];
+export const defaultLocale: Locale = 'en';
+export const localeNames: Record<Locale, string> = {
+  es: 'Español', de: 'Deutsch', en: 'English', fr: 'Français', it: 'Italiano', pt: 'Português'
+};
+export const localeFlags: Record<Locale, string> = {
+  es: '🇪🇸', de: '🇩🇪', en: '🇬🇧', fr: '🇫🇷', it: '🇮🇹', pt: '🇵🇹'
+};
+export const localePrefix = 'as-needed' as const;
+// localeMap: mapeo de códigos de país a Locale
+\`\`\`
+
+src/i18n/routing.ts:
+\`\`\`typescript
+import { createNavigation } from 'next-intl/navigation';
+import { defineRouting } from 'next-intl/routing';
+import { locales, defaultLocale, pathnames, localePrefix } from './config';
+export const routing = defineRouting({ locales, defaultLocale, pathnames, localePrefix });
+export const { Link, redirect, usePathname, useRouter, getPathname } = createNavigation(routing);
+\`\`\`
+
+src/i18n/request.ts:
+\`\`\`typescript
+import { getRequestConfig } from 'next-intl/server';
+import { locales, defaultLocale, Locale } from './config';
+export default getRequestConfig(async ({ requestLocale }) => {
+  let locale = await requestLocale;
+  if (!locale || !locales.includes(locale as Locale)) locale = defaultLocale;
+  return { locale, messages: (await import(\`../../messages/\${locale}.json\`)).default };
+});
+\`\`\`
+
+ARCHIVOS DE TRADUCCIÓN: messages/{es,de,en,fr,it,pt}.json
+- Claves para toda la interfaz de la aplicación
+- Usados con useTranslations() de next-intl
+
+
+================================================================================
+
+=== PROMPT 110: ARCHIVO public/sw.js — SERVICE WORKER ===
+
+Service Worker para PWA con soporte push notifications.
+
+FUNCIONALIDADES:
+1. CACHE STRATEGY:
+   - Cache-first para assets estáticos (JS, CSS, imágenes)
+   - Network-first para APIs
+   - Precache de la shell de la app
+
+2. PUSH NOTIFICATIONS:
+   - self.addEventListener('push', ...)
+   - Mostrar notificación con título, cuerpo e icono
+   - Click en notificación → abrir la app
+
+3. BACKGROUND SYNC:
+   - self.addEventListener('sync', ...)
+   - Sincronizar ubicaciones GPS pendientes
+
+4. LIFECYCLE:
+   - install: precachear recursos
+   - activate: limpiar cache antiguo
+   - fetch: interceptar requests
+
+5. VERSIONADO:
+   - CACHE_VERSION = 'eitaxi-v1'
+   - Actualizar cache cuando cambie la versión
+
+
+================================================================================
+
+=== PROMPT 111: ARCHIVOS PÚBLICOS ===
+
+public/manifest.json:
+{
+  "name": "Eitaxi - GPS Widget",
+  "short_name": "Eitaxi",
+  "description": "GPS tracking para conductores Eitaxi",
+  "start_url": "/widget",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#facc15",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icons/icon-72x72.svg", "sizes": "72x72", "type": "image/svg+xml" },
+    { "src": "/icons/icon-512x512.svg", "sizes": "512x512", "type": "image/svg+xml" }
+  ]
+}
+
+public/manifest-client.json:
+  Igual pero start_url: "/"
+
+public/logo.svg: Logo SVG de Eitaxi (🚕 con texto)
+public/icon.svg: Icono SVG (🚕)
+public/robots.txt: Allow all, sitemap reference
+
+
+================================================================================
+
+=== PROMPT 112: ARCHIVO src/app/globals.css ===
+
+Estilos globales con Tailwind CSS 4.
+
+CONTENIDO:
+- @import "tailwindcss"
+- @import "tw-animate-css"
+- Custom CSS variables para colores dark theme
+- Estilos base: body con bg-background text-foreground
+- Scrollbar personalizado (dark)
+- Animaciones custom (pulse, fade-in, slide-up)
+- Estilos para Leaflet maps (dark tiles)
+
+
+================================================================================
+
+=== PROMPT 113: ORDEN DE EJECUCIÓN ===
+
+TABLA DE EJECUCIÓN ORDENADA:
+
+| # | Prompt | Archivo | Dependencias | Comando post |
+|---|-------|---------|-------------|-------------|
+| 0 | 0 | - | Ninguna | bun create next-app |
+| 1 | 1 | .env | 0 | - |
+| 2 | 2 | prisma/schema.prisma | 0 | bunx prisma db push && bunx prisma generate |
+| 3 | 3 | src/lib/db.ts | 2 | - |
+| 4 | 4 | src/lib/utils.ts | 0 | - |
+| 5 | 5 | src/lib/constants.ts | 0 | - |
+| 6 | 6 | src/lib/cache.ts | 0 | bun add @upstash/redis |
+| 7 | 7 | src/app/layout.tsx | 4 | bun add framer-motion |
+| 8 | 8 | src/lib/auth.ts | 3 | - |
+| 9 | 9 | src/middleware.ts | 8 | - |
+| 10 | 10 | src/hooks/useSession.ts | 8 | - |
+| 11 | 11 | src/hooks/useLocale.ts | 0 | bun add next-intl |
+| 12 | 12 | src/hooks/use-toast.ts | 0 | - |
+| 13 | 14 | src/lib/geo-osm.ts | 0 | - |
+| 14 | 15 | src/lib/geo.ts | 13 | - |
+| 15 | 16 | src/lib/geo-data.ts | 0 | - |
+| 16 | 17 | src/lib/searchTranslations.ts | 0 | - |
+| 17 | 18 | src/lib/swiss-municipalities.ts | 0 | - |
+| 18 | 19 | src/lib/postal-codes-map.ts | 0 | - |
+| 19 | 20 | src/app/api/geocode/route.ts | 13 | - |
+| 20 | 21 | src/app/api/reverse/route.ts | 13,6 | - |
+| 21 | 22 | src/app/api/locations/route.ts | 13,17 | - |
+| 22 | 23 | src/app/api/route/route.ts | 13 | - |
+| 23 | 24 | src/app/api/route/calculate/route.ts | 13 | - |
+| 24 | 25-28 | APIs search/nearby/postal/cantons | 13,16,18,19,6 | - |
+| 25 | 29-31 | Páginas auth | 8,9 | - |
+| 26 | 32-35 | APIs auth | 3,8 | bun add bcryptjs |
+| 27 | 52 | src/lib/gpsSync.ts | 0 | - |
+| 28 | 53 | src/contexts/GPSContext.tsx | 27 | - |
+| 29 | 75 | src/contexts/DriverFormContext.tsx | 3,5 | - |
+| 30 | 64 | src/components/SessionGuard.tsx | 10 | - |
+| 31 | 65 | src/components/VehicleManager.tsx | 5,29 | - |
+| 32 | 66 | src/components/ScheduleSelector.tsx | 29 | - |
+| 33 | 67 | src/components/ZoneSelector.tsx | 16,18,29 | - |
+| 34 | 69 | src/components/FixedRoutesManager.tsx | 5,29 | - |
+| 35 | 70 | src/components/PlaceSearch.tsx | 21 | - |
+| 36 | 74 | src/components/PWAInstallPrompt.tsx | 0 | - |
+| 37 | 13 | src/app/page.tsx | 7,21,23,31,10 | bun add leaflet react-leaflet |
+| 38 | 36 | src/app/registrarse/page.tsx | 29,5,31,32,33,34 | - |
+| 39 | 37 | src/app/dashboard/[driverId]/page.tsx | 30,29,31,65,66,67,68,69 | - |
+| 40 | 38 | src/app/[canton]/[city]/[slug]/page.tsx | 13,72 | - |
+| 41 | 39 | src/app/api/drivers/route.ts | 3,8,13,16 | - |
+| 42 | 40 | src/app/api/taxis/route.ts | 3,39 | - |
+| 43 | 41 | src/app/api/taxis/search/route.ts | 3,13,17,18 | - |
+| 44 | 42-51 | APIs taxis/driver | 3,8 | - |
+| 45 | 76-91 | Cliente auth+bookings+push | 3 | - |
+| 46 | 92 | src/app/cuenta/page.tsx | 76-85 | - |
+| 47 | 93 | src/components/BookingModal.tsx | 82 | - |
+| 48 | 95 | src/components/CookieBanner.tsx | 0 | - |
+| 49 | 96 | src/components/ChatNotificationToast.tsx | 84 | - |
+| 50 | 97-99 | APIs auth global+admin | 8,76 | - |
+| 51 | 100 | src/lib/email.ts | 0 | bun add resend |
+| 52 | 102 | src/app/api/upload/route.ts | 0 | bun add sharp |
+| 53 | 103 | src/app/api/ai/generate-description | 0 | bun add z-ai-web-dev-sdk |
+| 54 | 104-105 | APIs cache/warmup | 6 | - |
+| 55 | 106 | src/app/privacidad/page.tsx | 0 | - |
+| 56 | 107 | src/app/terminos/page.tsx | 0 | - |
+| 57 | 108 | src/app/widget/page.tsx | 53,28 | - |
+| 58 | 109 | i18n files | 0 | bun add next-intl |
+| 59 | 110 | public/sw.js | 0 | - |
+| 60 | 111 | public manifests | 0 | - |
+| 61 | 112 | src/app/globals.css | 0 | - |
+| 62 | 54-63 | GPS pages+maps | 28,53 | bun add leaflet react-leaflet |
+| 63 | 71-73 | LiveMap+Reviews+DataMgmt | 41,43,44 | - |
+| 64 | 94 | src/app/registro/page.tsx | 0 | - |
+| 65 | 101 | src/lib/fastFetch.ts | 0 | - |
+
+DEPENDENCIAS PRINCIPALES (instalar con bun add):
+bcryptjs jose @upstash/redis leaflet react-leaflet @types/leaflet
+framer-motion lucide-react sharp next-intl date-fns recharts
+react-hook-form zod @hookform/resolvers class-variance-authority
+tailwind-merge clsx sonner vaul embla-carousel-react cmdk
+react-day-picker input-otp uuid geolib @dnd-kit/core @dnd-kit/sortable
+z-ai-web-dev-sdk @upstash/redis @tanstack/react-query zustand
+next-themes react-markdown react-resizable-panels
+
+DEPENDENCIAS DEV (instalar con bun add -d):
+@tailwindcss/postcss tailwindcss tw-animate-css @types/bcryptjs
+@types/react @types/react-dom eslint eslint-config-next typescript
+bun-types
+
+
+================================================================================
+
+FIN DEL DOCUMENTO DE PROMPTS PARA REPLICAR EITAXI
+
+Resumen:
+- 113 prompts en total
+- 65+ archivos de código
+- ~20,000+ líneas de código estimadas
+- Stack: Next.js 15, TypeScript, Tailwind CSS 4, shadcn/ui, Prisma + SQLite
+- APIs: Nominatim, OSRM, Overpass, Resend, z-ai-web-dev-sdk
+- 6 idiomas: es, de, en, fr, it, pt
+- Motor de búsqueda con 10 reglas de matching
+- Sistema GPS con BroadcastChannel sync
+- PWA con Service Worker y push notifications
+- Cumplimiento nDSG/GDPR
+
+================================================================================`;
+
+fs.writeFileSync('/home/z/my-project/download/Eitaxi-Completo-Prompts-Para-Replicar.txt', S, 'utf8');
+console.log('File created. Size: ' + (S.length / 1024).toFixed(1) + ' KB');
+console.log('Lines: ' + S.split('\\n').length);
