@@ -51,3 +51,28 @@ export async function sendPasswordReset(
     html: `<h1>Restablecer contraseña</h1><p>Hola ${name}, haz clic <a href="${resetUrl}">aquí</a> para restablecer tu contraseña.</p>`,
   });
 }
+
+// Daily report emails
+export async function sendDailyReportEmail(
+  driverEmail: string,
+  driverName: string,
+  stats: { total: number; confirmed: number; pending: number; cancelled: number; completed: number }
+) {
+  return sendEmail({
+    to: driverEmail,
+    subject: `Reporte diario de reservas - eitaxi`,
+    html: `<h1>Reporte diario</h1><p>Hola ${driverName}, tus reservas de ayer: ${stats.total} total, ${stats.confirmed} confirmadas, ${stats.pending} pendientes, ${stats.completed} completadas, ${stats.cancelled} canceladas.</p>`,
+  });
+}
+
+export async function sendAdminDailyReportEmail(
+  adminEmail: string,
+  stats: Array<{ driverName: string; total: number; confirmed: number; pending: number; cancelled: number; completed: number }>
+) {
+  const totalBookings = stats.reduce((sum, s) => sum + s.total, 0);
+  return sendEmail({
+    to: adminEmail,
+    subject: `Reporte global diario - eitaxi`,
+    html: `<h1>Reporte global</h1><p>${stats.length} conductores, ${totalBookings} reservas totales.</p>`,
+  });
+}

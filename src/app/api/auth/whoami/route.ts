@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth';
-import { getClientServerSession } from '@/lib/client-auth';
+import { getClientSession as getClientServerSession } from '@/lib/client-auth';
 import { db } from '@/lib/db';
 
 export async function GET() {

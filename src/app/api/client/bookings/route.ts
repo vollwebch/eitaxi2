@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getClientServerSession } from '@/lib/client-auth';
+import { getClientSession as getClientServerSession } from '@/lib/client-auth';
 
 // GET - Obtener reservas del cliente autenticado
 export async function GET() {
