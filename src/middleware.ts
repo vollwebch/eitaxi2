@@ -1,33 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
 
-// Rutas que requieren autenticación
+// Rutas que requieren autenticación de CONDUCTOR
 const PROTECTED_ROUTES = [
   '/dashboard/',
   '/gps/',
-  '/gps-quick',
-  '/registrarse',
-  '/cuenta',
 ];
 
-// Rutas públicas (no necesitan auth)
-const PUBLIC_ROUTES = [
-  '/',
-  '/login',
-  '/api/',
-  '/_next/',
-  '/terminos',
-  '/privacidad',
-  '/recuperar-password',
-  '/restablecer-password',
-  '/widget',
-  '/track/',
+// Rutas que requieren autenticación de CLIENTE
+const CLIENT_PROTECTED_ROUTES = [
+  '/cuenta',
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Permitir rutas de assets y APIs públicas
+  // Permitir rutas de assets, APIs públicas y archivos estáticos
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/api/') ||
@@ -37,17 +25,21 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/restablecer-password') ||
     pathname.startsWith('/widget') ||
     pathname.startsWith('/track/') ||
-    pathname.includes('.') // archivos estáticos
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/registrarse') ||
+    pathname.startsWith('/registro') ||
+    pathname.startsWith('/gps-quick') ||
+    pathname.includes('.') // archivos estáticos (img, css, js, etc.)
   ) {
     return NextResponse.next();
   }
 
-  // Verificar si es una ruta protegida
-  const isProtectedRoute = PROTECTED_ROUTES.some(route =>
+  // Verificar si es una ruta protegida de CONDUCTOR
+  const isDriverProtected = PROTECTED_ROUTES.some(route =>
     pathname.startsWith(route)
   );
 
-  if (isProtectedRoute) {
+  if (isDriverProtected) {
     const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
 
     if (!sessionToken) {
@@ -83,6 +75,17 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(`/gps/${session.driverId}`, request.url));
       }
     }
+  }
+
+  // Verificar si es una ruta protegida de CLIENTE
+  const isClientProtected = CLIENT_PROTECTED_ROUTES.some(route =>
+    pathname.startsWith(route)
+  );
+
+  if (isClientProtected) {
+    // La página /cuenta maneja su propia autenticación internamente
+    // (muestra login/registro si no está autenticado, dashboard si lo está)
+    return NextResponse.next();
   }
 
   return NextResponse.next();
