@@ -60,3 +60,24 @@ Stage Summary:
 - GitHub: vollwebch/eitaxi2 (commit 9d973ff)
 - Supabase: 2,962 registros completos
 - Todas las APIs funcionando
+
+---
+Task ID: fix-critical-bugs
+Agent: main
+Task: Fix 6 critical bugs found during deep audit
+
+Work Log:
+- Fixed driver registration password validation mismatch (frontend min 6 → min 8, matching API)
+- Fixed client registration password validation mismatch (frontend min 6 → min 8, matching API)
+- Fixed clientId undefined bug in cuenta/page.tsx (data.data.id → data.data.clientId) on lines 206 and 258
+- Updated password placeholder text from "6 caracteres" to "8 caracteres" in both registration forms
+- Added "Mi cuenta" button in header navigation linking to /cuenta (client login/register)
+- Added client/conductor separation in mobile menu (3 buttons: Mi cuenta, Acceder conductor, Ser conductor)
+- Added "¿Olvidaste tu contraseña?" link to driver login page (/login → /recuperar-password)
+- Build passes with no errors
+- Pushed to GitHub (c671b45)
+- Deployed to Vercel (READY)
+
+Stage Summary:
+- 6 bugs fixed: password validation x2, clientId x1, navigation x2, forgot password x1
+- All changes deployed to https://my-project-alpha-neon.vercel.app
