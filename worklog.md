@@ -81,3 +81,25 @@ Work Log:
 Stage Summary:
 - 6 bugs fixed: password validation x2, clientId x1, navigation x2, forgot password x1
 - All changes deployed to https://my-project-alpha-neon.vercel.app
+
+---
+Task ID: fix-middleware-critical
+Agent: main
+Task: Fix middleware blocking registration and GPS pages + restore widget manual ID entry
+
+Work Log:
+- Found ROOT CAUSE: /registrarse was in PROTECTED_ROUTES but not in bypass list → new drivers could never register (deadlock: can't register without login, can't login without registering)
+- Found /gps-quick was also blocked by middleware
+- Found widget required login only, no fallback to manual ID entry like backup
+- Rewrote middleware.ts: removed /registrarse, /gps-quick, /login from protected routes; added explicit bypass for public pages
+- /cuenta now bypasses middleware (handles auth internally)
+- Only /dashboard/ and /gps/ (with driverId) are truly protected
+- Restored widget with 3 fallback levels: API session → URL params → localStorage → manual prompt
+- Added "Introducir ID de conductor" button to widget login screen
+- Build passes, pushed to GitHub (b4d90d0), deployed to Vercel (READY)
+
+Stage Summary:
+- Registration is now accessible to everyone again
+- GPS-quick is now accessible again
+- Widget works with or without login
+- Deployed to https://my-project-alpha-neon.vercel.app
