@@ -132,7 +132,7 @@ const FIELD_TO_STEP_MAP: Record<string, { step: number; label: string; fieldLabe
   email: { step: 1, label: "Datos básicos", fieldLabel: "Email" },
   password: { step: 1, label: "Datos básicos", fieldLabel: "Contraseña" },
   confirmPassword: { step: 1, label: "Datos básicos", fieldLabel: "Confirmar contraseña" },
-  passwordLength: { step: 1, label: "Datos básicos", fieldLabel: "Contraseña (mínimo 6 caracteres)" },
+  passwordLength: { step: 1, label: "Datos básicos", fieldLabel: "Contraseña (mínimo 8 caracteres)" },
   passwordMatch: { step: 1, label: "Datos básicos", fieldLabel: "Las contraseñas no coinciden" },
   // Step 2: Ubicación
   cantonId: { step: 2, label: "Ubicación", fieldLabel: "Cantón" },
@@ -496,7 +496,7 @@ export default function RegistrarsePage() {
         if (!formData.phone?.trim()) missingFields.push('phone');
         if (!formData.email?.trim()) missingFields.push('email');
         if (!formData.password) missingFields.push('password');
-        else if (formData.password.length < 6) missingFields.push('passwordLength');
+        else if (formData.password.length < 8) missingFields.push('passwordLength');
         if (!formData.confirmPassword) missingFields.push('confirmPassword');
         else if (formData.password !== formData.confirmPassword) missingFields.push('passwordMatch');
         break;
@@ -1174,7 +1174,7 @@ export default function RegistrarsePage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="password">Contraseña * (mín. 6 caracteres)</Label>
+                          <Label htmlFor="password">Contraseña * (mín. 8 caracteres)</Label>
                           <div className="relative mt-1.5">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -1190,7 +1190,7 @@ export default function RegistrarsePage() {
                             />
                           </div>
                           {validationErrors.includes('password') && (
-                            <p className="text-xs text-red-500 mt-1">Mínimo 6 caracteres</p>
+                            <p className="text-xs text-red-500 mt-1">Mínimo 8 caracteres</p>
                           )}
                         </div>
                         <div>

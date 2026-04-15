@@ -38,6 +38,7 @@ import {
   Radio,
   Download,
   Smartphone,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -295,10 +296,12 @@ function Header({
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Login siempre visible en móvil */}
-            <Link href="/login">
+            {/* Acceder cliente - siempre visible */}
+            <Link href="/cuenta">
               <Button variant="ghost" size="sm" className="text-sm">
-                Acceder
+                <User className="mr-1.5 h-4 w-4" />
+                <span className="hidden sm:inline">Mi cuenta</span>
+                <span className="sm:hidden">Cuenta</span>
               </Button>
             </Link>
             {/* Ser conductor visible en sm+ */}
@@ -1421,9 +1424,16 @@ function MobileMenu({
           </div>
 
           <div className="mt-8 pt-6 border-t border-border">
+            <Link href="/cuenta" onClick={onClose}>
+              <Button variant="outline" className="w-full mb-3">
+                <User className="mr-2 h-4 w-4" />
+                Mi cuenta (Cliente)
+              </Button>
+            </Link>
             <Link href="/login" onClick={onClose}>
               <Button variant="outline" className="w-full mb-3">
-                Acceder
+                <Car className="mr-2 h-4 w-4" />
+                Acceder conductor
               </Button>
             </Link>
             <Link href="/registrarse" onClick={onClose}>

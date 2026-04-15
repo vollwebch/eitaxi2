@@ -203,7 +203,7 @@ function AuthForms() {
         localStorage.setItem(
           "eitaxi_client_session",
           JSON.stringify({
-            clientId: data.data.id,
+            clientId: data.data.clientId,
             email: data.data.email,
             name: data.data.name,
             loginTime: new Date().toISOString(),
@@ -229,8 +229,8 @@ function AuthForms() {
       setRegError("Por favor completa todos los campos obligatorios");
       return;
     }
-    if (regPassword.length < 6) {
-      setRegError("La contraseña debe tener al menos 6 caracteres");
+    if (regPassword.length < 8) {
+      setRegError("La contraseña debe tener al menos 8 caracteres");
       return;
     }
     if (regPassword !== regConfirmPassword) {
@@ -255,7 +255,7 @@ function AuthForms() {
         localStorage.setItem(
           "eitaxi_client_session",
           JSON.stringify({
-            clientId: data.data.id,
+            clientId: data.data.clientId,
             email: data.data.email,
             name: data.data.name,
             loginTime: new Date().toISOString(),
@@ -495,7 +495,7 @@ function AuthForms() {
                       <Input
                         id="reg-password"
                         type="password"
-                        placeholder="Mínimo 6 caracteres"
+                        placeholder="Mínimo 8 caracteres"
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         className="pl-10"
