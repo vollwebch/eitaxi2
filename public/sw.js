@@ -1,5 +1,5 @@
-// TaxiZone Service Worker - GPS Reminders
-const CACHE_NAME = 'taxizone-v1';
+// eitaxi Service Worker - GPS Reminders
+const CACHE_NAME = 'eitaxi-v1';
 const NOTIFICATION_TAG = 'gps-reminder';
 
 // Install event
@@ -45,7 +45,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || '🚕 TaxiZone', options)
+    self.registration.showNotification(data.title || '🚕 eitaxi', options)
   );
 });
 
@@ -89,7 +89,7 @@ async function checkGPSAndNotify() {
     const clients = await self.clients.matchAll();
     
     // Send reminder notification
-    await self.registration.showNotification('🚕 TaxiZone', {
+    await self.registration.showNotification('🚕 eitaxi', {
       body: '¡Recuerda activar tu GPS para recibir más clientes hoy!',
       icon: '/icons/icon-192x192.png',
       badge: '/icons/badge-72x72.png',
