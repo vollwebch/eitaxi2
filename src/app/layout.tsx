@@ -14,6 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#facc15",
+};
+
 export const metadata: Metadata = {
   title: "eitaxi - Encuentra tu taxi en Suiza",
   description: "La plataforma líder de taxis en Suiza. Encuentra taxistas verificados, reserva traslados al aeropuerto, viajes de larga distancia y más. Conecta directamente con conductores profesionales.",
@@ -28,10 +32,6 @@ export const metadata: Metadata = {
     description: "Encuentra tu taxi ideal en Suiza. Taxistas verificados, servicio 24/7.",
     type: "website",
   },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#facc15",
 };
 
 export default function RootLayout({

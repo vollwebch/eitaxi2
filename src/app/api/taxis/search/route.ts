@@ -812,9 +812,8 @@ async function getDriversWithLocation(): Promise<DriverForSearch[]> {
       id: d.id,
       name: d.name,
       slug: d.slug,
-      // 🔒 Teléfono y WhatsApp se mantienen internos, no en la respuesta pública
-      // phone: d.phone,
-      // whatsapp: d.whatsapp,
+      phone: d.phone,
+      whatsapp: d.whatsapp,
       city: d.city,
       canton: d.canton,
       latitude: d.latitude,
@@ -1466,12 +1465,15 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: results.map(r => ({
-          ...r.driver,
-          priority: r.priority.level,
-          priorityLabel: r.priority.label,
-          matchReason: r.matchReason
-        })),
+        data: results.map(r => {
+          const { phone, whatsapp, ...driverWithoutContact } = r.driver;
+          return {
+            ...driverWithoutContact,
+            priority: r.priority.level,
+            priorityLabel: r.priority.label,
+            matchReason: r.matchReason
+          };
+        }),
         total: results.length
       });
     }
@@ -1550,12 +1552,15 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: matchResults.map(r => ({
-          ...r.driver,
-          priority: r.priority.level,
-          priorityLabel: r.priority.label,
-          matchReason: r.matchReason
-        })),
+        data: matchResults.map(r => {
+          const { phone, whatsapp, ...driverWithoutContact } = r.driver;
+          return {
+            ...driverWithoutContact,
+            priority: r.priority.level,
+            priorityLabel: r.priority.label,
+            matchReason: r.matchReason
+          };
+        }),
         total: matchResults.length,
         query,
         resolvedLocation: location.displayName
@@ -1566,10 +1571,15 @@ export async function GET(request: NextRequest) {
     // SIN PARÁMETROS: RETORNAR TODOS LOS CONDUCTORES
     // =========================================================================
     const allDrivers = await getDriversWithLocation();
+    // 🔒 Ocultar phone y whatsapp de la respuesta (nDSG)
+    const sanitizedDrivers = allDrivers.map(d => {
+      const { phone, whatsapp, ...driverWithoutContact } = d;
+      return driverWithoutContact;
+    });
     return NextResponse.json({
       success: true,
-      data: allDrivers,
-      total: allDrivers.length
+      data: sanitizedDrivers,
+      total: sanitizedDrivers.length
     });
 
   } catch (error) {

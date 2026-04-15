@@ -119,27 +119,10 @@ export default function LoginPage() {
                     onChange={(e) => {
                       const value = e.target.value;
                       setEmail(value);
-                      
-                      // Validar caracteres especiales en tiempo real
-                      const specialChars = /[ñçáéíóúàèìòùâêîôûäëïöü]/i;
-                      if (specialChars.test(value)) {
-                        setEmailCharError('Los caracteres especiales (ñ, ç, acentos) no son válidos en emails. Usa letras sin acento (ej: n en lugar de ñ)');
-                      } else {
-                        setEmailCharError(null);
-                      }
                     }}
-                    onInvalid={(e) => {
-                      const input = e.target as HTMLInputElement;
-                      if (input.value && /[ñçáéíóúàèìòùâêîôûäëïöü]/i.test(input.value)) {
-                        input.setCustomValidity('Los caracteres especiales como ñ, ç, acentos no son válidos en direcciones de email. Por favor, usa solo letras sin acentos (ej: n en lugar de ñ)');
-                      } else {
-                        input.setCustomValidity('Por favor, introduce una dirección de email válida');
-                      }
-                    }}
-                    onInput={(e) => {
-                      (e.target as HTMLInputElement).setCustomValidity('');
-                    }}
-                    className={`pl-10 ${emailCharError ? 'border-red-500 focus-visible:ring-red-500 ring-2 ring-red-500/20' : ''}`}
+                    // Browser native type="email" validation is sufficient
+                    // Supports ñ, ç, acentos and other Latin characters per RFC 6531
+                    className="pl-10"
                     disabled={loading}
                     autoComplete="email"
                   />

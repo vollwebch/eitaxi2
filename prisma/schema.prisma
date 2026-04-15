@@ -129,6 +129,7 @@ model TaxiDriver {
   city                City                @relation(fields: [cityId], references: [id])
   canton              Canton              @relation(fields: [cantonId], references: [id])
   vehicles            Vehicle[]
+  bookings            Booking[]
 }
 
 model DriverLocation {
@@ -243,4 +244,106 @@ model Vehicle {
 
   @@index([driverId])
   @@index([vehicleType])
+}
+
+model Client {
+  id              String       @id @default(cuid())
+  name            String
+  email           String       @unique
+  password        String
+  phone           String?
+  avatarUrl       String?
+  preferredLang   String       @default("es")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  bookings        Booking[]
+  messagesSent     Message[]     @relation("SenderClient")
+  messagesReceived Message[]    @relation("ReceiverClient")
+  notifications   Notification[]
+  pushSubscriptions ClientPushSubscription[]
+}
+
+model Booking {
+  id              String     @id @default(cuid())
+  clientId        String
+  driverId        String
+  status          String     @default("pending")
+  pickupAddress   String
+  pickupLat       Float?
+  pickupLon       Float?
+  destAddress     String?
+  destLat         Float?
+  destLon         Float?
+  scheduledFor    DateTime?
+  passengerCount  Int        @default(1)
+  price           Float?
+  notes           String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  client          Client     @relation(fields: [clientId], references: [id])
+  driver          TaxiDriver @relation(fields: [driverId], references: [id])
+  messages        Message[]
+
+  @@index([clientId])
+  @@index([driverId])
+  @@index([status])
+}
+
+model Message {
+  id          String     @id @default(cuid())
+  bookingId   String?
+  senderId    String
+  receiverId  String
+  senderType  String
+  content     String
+  isRead      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  booking     Booking?   @relation(fields: [bookingId], references: [id])
+  senderClient  Client?  @relation("SenderClient", fields: [senderId], references: [id])
+  receiverClient Client? @relation("ReceiverClient", fields: [receiverId], references: [id])
+
+  @@index([bookingId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  clientId    String
+  title       String
+  body        String
+  type        String
+  isRead      Boolean  @default(false)
+  link        String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model ClientPushSubscription {
+  id        String   @id @default(cuid())
+  clientId  String
+  endpoint  String
+  keysAuth  String
+  keysP256dh String
+  createdAt DateTime @default(now())
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  driverId  String
+  endpoint  String
+  keysAuth  String
+  keysP256dh String
+  createdAt DateTime @default(now())
+
+  @@index([driverId])
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from '@/hooks/useSession';
 
@@ -13,14 +13,37 @@ interface SessionGuardProps {
 export function SessionGuard({ children, redirectToDashboard = false }: SessionGuardProps) {
   const router = useRouter();
   const { session, loading } = useSession();
+  const [serverCheckDone, setServerCheckDone] = useState(false);
 
   useEffect(() => {
     if (!loading && redirectToDashboard && session) {
-      router.replace(`/dashboard/${session.driverId}`);
+      // Client-side only: verify session via /api/auth/session
+      // If it fails, clear stale localStorage and redirect to /login
+      fetch('/api/auth/session')
+        .then(res => res.json())
+        .then(data => {
+          setServerCheckDone(true);
+          if (data.authenticated) {
+            router.replace(`/dashboard/${data.session.driverId}`);
+          } else {
+            // Server session invalid/expired - clear stale localStorage
+            localStorage.removeItem('eitaxi_session');
+            localStorage.removeItem('eitaxi_driver_id');
+          }
+        })
+        .catch(() => {
+          setServerCheckDone(true);
+          // If we can't reach the server, clear stale localStorage
+          localStorage.removeItem('eitaxi_session');
+          localStorage.removeItem('eitaxi_driver_id');
+        });
+    } else if (!loading) {
+      setServerCheckDone(true);
     }
   }, [loading, session, redirectToDashboard, router]);
 
-  if (loading) {
+  // Show spinner while checking session
+  if (loading || (redirectToDashboard && session && !serverCheckDone)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-2 border-yellow-400 border-t-transparent rounded-full"></div>

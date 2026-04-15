@@ -384,8 +384,7 @@ export async function GET(request: NextRequest) {
         id: driver.id,
         name: driver.name,
         slug: driver.slug,
-        // 🔒 Teléfono y WhatsApp NO se exponen en API pública (nDSG)
-        // Los clientes deben contactar a través del perfil del conductor
+        // 🔒 phone y whatsapp no expuestos en API pública (nDSG)
         imageUrl: driver.imageUrl,
         rating: driver.rating,
         reviewCount: driver.reviewCount,
