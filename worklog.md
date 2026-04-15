@@ -103,3 +103,23 @@ Stage Summary:
 - GPS-quick is now accessible again
 - Widget works with or without login
 - Deployed to https://my-project-alpha-neon.vercel.app
+
+---
+Task ID: 1
+Agent: main
+Task: Fix 3 critical API/performance issues on eitaxi deployed site
+
+Work Log:
+- Diagnosed /api/cantons timeout: was including all 2482 municipalities via `include: { cities }` causing >30s response. Fixed by using `select` with only needed fields (id, name, code, slug, country, _count)
+- Diagnosed /api/taxis/live returning 0: was filtering `trackingEnabled: true` but NO drivers had this enabled. Fixed to show ALL active drivers using their base city coordinates (latitude/longitude), falling back to GPS location when available and recent (<5 min)
+- Fixed lastLocation references that would crash when driver has no GPS data (null safety)
+- Fixed homepage infinite loading: `Promise.all([fetch taxis, fetch cantons])` would block forever if cantons timed out. Added `fetchWithTimeout` helper (10s for taxis, 8s for cantons) so each request fails independently
+- Increased GPS stale threshold from 2 min to 5 min
+- Used driver.operationRadius for base zone check instead of hardcoded 15km
+
+Stage Summary:
+- /api/cantons: >30s → 0.55s
+- /api/taxis/live: 0 results → 2 results (Zürich area), shows all active drivers
+- /api/taxis: 1.6s, returns 11 drivers
+- Homepage: loading state now resolves even if one API fails
+- All fixes pushed to GitHub and deployed to Vercel (deployment READY)
