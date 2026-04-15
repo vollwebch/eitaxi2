@@ -39,6 +39,8 @@ import {
   Download,
   Smartphone,
   User,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +60,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle, SheetHeader } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Leaflet CSS - solo en cliente
 if (typeof window !== 'undefined') {
@@ -255,6 +265,194 @@ function Header({
   onCantonSelect: (canton: Canton) => void;
   onMobileMenuOpen: () => void;
 }) {
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionType, setSessionType] = useState<'driver' | 'client' | null>(null);
+
+  useEffect(() => {
+    // Check if driver is logged in
+    const driverSession = localStorage.getItem('eitaxi_session');
+    if (driverSession) {
+      try {
+        const parsed = JSON.parse(driverSession);
+        if (parsed.driverId) {
+          setIsLoggedIn(true);
+          setSessionType('driver');
+          return;
+        }
+      } catch { /* ignore */ }
+    }
+    // Check if client is logged in
+    const clientSession = localStorage.getItem('eitaxi_client_session');
+    if (clientSession) {
+      try {
+        const parsed = JSON.parse(clientSession);
+        if (parsed.clientId) {
+          setIsLoggedIn(true);
+          setSessionType('client');
+          return;
+        }
+      } catch { /* ignore */ }
+    }
+    setIsLoggedIn(false);
+    setSessionType(null);
+  }, []);
+
+  // ===== NOT LOGGED IN: Show "Acceder" button =====
+  if (!isLoggedIn) {
+    return (
+      <>
+        <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl">
+          <div className="container mx-auto px-4">
+            <div className="flex h-16 items-center justify-between">
+              <Link href="/" className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-500">
+                  <Car className="h-6 w-6 text-black" />
+                </div>
+                <span className="text-xl font-bold">
+                  <span className="text-yellow-400">ei</span>
+                  <span className="text-white">taxi</span>
+                </span>
+              </Link>
+
+              <nav className="hidden md:flex items-center gap-6">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="gap-1">
+                      Cantones <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
+                    {cantons.length > 0 ? cantons.map((canton) => (
+                      <DropdownMenuItem
+                        key={canton.id}
+                        onClick={() => onCantonSelect(canton)}
+                        className="flex items-center justify-between"
+                      >
+                        <span>{canton.name}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {canton._count?.drivers || 0}
+                        </Badge>
+                      </DropdownMenuItem>
+                    )) : (
+                      <DropdownMenuItem disabled>Cargando...</DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </nav>
+
+              <div className="flex items-center gap-1 sm:gap-2">
+                {/* Acceder - abre diálogo con tabs */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-sm"
+                  onClick={() => setShowLoginDialog(true)}
+                >
+                  <LogIn className="mr-1.5 h-4 w-4" />
+                  <span className="hidden xs:inline sm:inline">Acceder</span>
+                </Button>
+                {/* Ser conductor - visible en sm+ */}
+                <Link href="/registrarse" className="hidden sm:block">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
+                  >
+                    <Car className="mr-1.5 h-4 w-4" />
+                    Ser conductor
+                  </Button>
+                </Link>
+                {/* Menú hamburguesa en móvil */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  onClick={onMobileMenuOpen}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Diálogo de Acceder con tabs Cliente / Conductor */}
+        <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-center text-xl">Acceder</DialogTitle>
+              <DialogDescription className="text-center text-muted-foreground">
+                Elige cómo quieres entrar
+              </DialogDescription>
+            </DialogHeader>
+            <Tabs defaultValue="cliente" className="mt-2">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="cliente" className="gap-1.5">
+                  <User className="h-4 w-4" />
+                  Cliente
+                </TabsTrigger>
+                <TabsTrigger value="conductor" className="gap-1.5">
+                  <Car className="h-4 w-4" />
+                  Conductor
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="cliente" className="mt-6">
+                <div className="space-y-4">
+                  <div className="text-center mb-4">
+                    <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-yellow-400/10 flex items-center justify-center">
+                      <User className="h-8 w-8 text-yellow-400" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Busca taxis, reserva viajes y gestiona tus reservas
+                    </p>
+                  </div>
+                  <Link href="/cuenta" onClick={() => setShowLoginDialog(false)}>
+                    <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500 h-12 text-base">
+                      Iniciar sesión como cliente
+                    </Button>
+                  </Link>
+                  <Link href="/cuenta" onClick={() => setShowLoginDialog(false)}>
+                    <Button variant="outline" className="w-full h-12 text-base">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Crear cuenta de cliente
+                    </Button>
+                  </Link>
+                </div>
+              </TabsContent>
+              <TabsContent value="conductor" className="mt-6">
+                <div className="space-y-4">
+                  <div className="text-center mb-4">
+                    <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-yellow-400/10 flex items-center justify-center">
+                      <Car className="h-8 w-8 text-yellow-400" />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Gestiona tu perfil, GPS, rutas y reservas
+                    </p>
+                  </div>
+                  <Link href="/login" onClick={() => setShowLoginDialog(false)}>
+                    <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500 h-12 text-base">
+                      Iniciar sesión como conductor
+                    </Button>
+                  </Link>
+                  <Link href="/registrarse" onClick={() => setShowLoginDialog(false)}>
+                    <Button variant="outline" className="w-full h-12 text-base">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Crear perfil de conductor
+                    </Button>
+                  </Link>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  // ===== LOGGED IN: Show "Cuenta" + "Registrarse" =====
+  const cuentaHref = sessionType === 'client' ? '/cuenta' : `/dashboard/${JSON.parse(localStorage.getItem('eitaxi_session') || '{}').driverId || ''}`;
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl">
       <div className="container mx-auto px-4">
@@ -296,23 +494,23 @@ function Header({
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Acceder cliente - siempre visible */}
-            <Link href="/cuenta">
+            {/* Cuenta - logged in */}
+            <Link href={cuentaHref}>
               <Button variant="ghost" size="sm" className="text-sm">
                 <User className="mr-1.5 h-4 w-4" />
-                <span className="hidden sm:inline">Mi cuenta</span>
+                <span className="hidden sm:inline">Cuenta</span>
                 <span className="sm:hidden">Cuenta</span>
               </Button>
             </Link>
-            {/* Ser conductor visible en sm+ */}
+            {/* Registrarse - al lado */}
             <Link href="/registrarse" className="hidden sm:block">
               <Button
                 variant="outline"
                 size="sm"
                 className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
               >
-                <Car className="mr-2 h-4 w-4" />
-                Ser conductor
+                <UserPlus className="mr-1.5 h-4 w-4" />
+                Registrarse
               </Button>
             </Link>
             {/* Menú hamburguesa en móvil */}
@@ -1425,21 +1623,21 @@ function MobileMenu({
 
           <div className="mt-8 pt-6 border-t border-border">
             <Link href="/cuenta" onClick={onClose}>
-              <Button variant="outline" className="w-full mb-3">
+              <Button variant="outline" className="w-full mb-3 justify-start">
                 <User className="mr-2 h-4 w-4" />
-                Mi cuenta (Cliente)
+                Iniciar sesión (Cliente)
               </Button>
             </Link>
             <Link href="/login" onClick={onClose}>
-              <Button variant="outline" className="w-full mb-3">
+              <Button variant="outline" className="w-full mb-3 justify-start">
                 <Car className="mr-2 h-4 w-4" />
-                Acceder conductor
+                Iniciar sesión (Conductor)
               </Button>
             </Link>
             <Link href="/registrarse" onClick={onClose}>
-              <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
-                <Car className="mr-2 h-4 w-4" />
-                Ser conductor
+              <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500 justify-start">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Crear cuenta de conductor
               </Button>
             </Link>
           </div>
