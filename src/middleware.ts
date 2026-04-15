@@ -7,6 +7,7 @@ const PROTECTED_ROUTES = [
   '/gps/',
   '/gps-quick',
   '/registrarse',
+  '/cuenta',
 ];
 
 // Rutas públicas (no necesitan auth)
@@ -89,6 +90,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icons/|uploads/|manifest.json|sw.js|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icons/|uploads/|manifest.json|manifest-client.json|sw.js|robots.txt).*)',
   ],
 };
