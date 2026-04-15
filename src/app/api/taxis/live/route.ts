@@ -277,11 +277,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ...cached, fromCache: true })
     }
 
-    // Obtener conductores con tracking activo
+    // Obtener conductores activos
+    // Incluir tanto los que tienen GPS activo como los que no (usar ubicación base)
     const drivers = await db.taxiDriver.findMany({
       where: {
         isActive: true,
-        trackingEnabled: true,
       },
       include: {
         city: true,
@@ -302,19 +302,42 @@ export async function GET(request: NextRequest) {
     const taxisWithLocation: any[] = []
 
     for (const driver of drivers) {
-      if (!checkSchedule(driver.trackingMode, driver.trackingSchedule)) {
+      // Verificar horario para conductores con tracking
+      if (driver.trackingEnabled && !checkSchedule(driver.trackingMode, driver.trackingSchedule)) {
         continue
       }
 
+      // Determinar ubicación: GPS real-time o base de la ciudad
       const lastLocation = driver.locations[0]
-      if (!lastLocation) continue
+      let driverLat: number, driverLon: number, locationAge: number, locationType: string
 
-      const locationAge = Date.now() - lastLocation.createdAt.getTime()
-      if (locationAge > 2 * 60 * 1000) continue
+      if (lastLocation && driver.trackingEnabled) {
+        // GPS real-time: usar solo si es reciente (últimos 5 minutos)
+        locationAge = Date.now() - lastLocation.createdAt.getTime()
+        if (locationAge > 5 * 60 * 1000) {
+          // GPS stale - usar ubicación base
+          if (!driver.latitude || !driver.longitude) continue
+          driverLat = driver.latitude
+          driverLon = driver.longitude
+          locationAge = 0
+          locationType = 'base'
+        } else {
+          driverLat = lastLocation.latitude
+          driverLon = lastLocation.longitude
+          locationType = 'gps'
+        }
+      } else {
+        // Sin GPS - usar ubicación base (ciudad del conductor)
+        if (!driver.latitude || !driver.longitude) continue
+        driverLat = driver.latitude
+        driverLon = driver.longitude
+        locationAge = 0
+        locationType = 'base'
+      }
 
       const distanceToClient = calculateDistance(
         clientLat, clientLon,
-        lastLocation.latitude, lastLocation.longitude
+        driverLat, driverLon
       )
 
       if (distanceToClient > radius) continue
@@ -324,10 +347,10 @@ export async function GET(request: NextRequest) {
       
       if (driver.city?.latitude && driver.city?.longitude) {
         distanceFromBase = calculateDistance(
-          lastLocation.latitude, lastLocation.longitude,
+          driverLat, driverLon,
           driver.city.latitude, driver.city.longitude
         )
-        isInBaseZone = distanceFromBase <= 15
+        isInBaseZone = distanceFromBase <= (driver.operationRadius || 15)
       }
 
       // Procesar zonas de servicio
@@ -397,10 +420,11 @@ export async function GET(request: NextRequest) {
         vehicleYear: driver.vehicleYear,
         
         location: {
-          latitude: lastLocation.latitude,
-          longitude: lastLocation.longitude,
-          timestamp: lastLocation.createdAt.toISOString(),
+          latitude: driverLat,
+          longitude: driverLon,
+          timestamp: lastLocation?.createdAt?.toISOString() || new Date().toISOString(),
           age: Math.round(locationAge / 1000),
+          type: locationType || 'base',
         },
         
         baseCity: {

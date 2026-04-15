@@ -9,7 +9,7 @@ const CACHE_TTL = 5 * 60 * 1000
 export async function GET() {
   try {
     // Check cache first
-    const cached = await getCached<any[]>(CACHE_KEY)
+    const cached = await getCached<any>(CACHE_KEY)
     if (cached) {
       return NextResponse.json({
         success: true,
@@ -18,11 +18,15 @@ export async function GET() {
       })
     }
 
+    // Consulta ligera: solo cantones con conteo de conductores
+    // NO incluir cities (2482 municipios) para evitar timeout en Supabase
     const cantons = await db.canton.findMany({
-      include: {
-        cities: {
-          orderBy: { name: 'asc' },
-        },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        slug: true,
+        country: true,
         _count: {
           select: { drivers: true },
         },

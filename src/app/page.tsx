@@ -1797,22 +1797,33 @@ export default function eitaxiPage() {
     tripDurationFormatted?: string;
   } | null>(null);
 
-  // Fetch initial data
+  // Fetch initial data - separados con timeout individual para no bloquearse entre sí
   useEffect(() => {
+    const fetchWithTimeout = async (url: string, ms: number) => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), ms);
+      try {
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
+        return await res.json();
+      } catch (e) {
+        clearTimeout(timeout);
+        return null;
+      }
+    };
+
     const fetchData = async () => {
       try {
-        const [driversRes, cantonsRes] = await Promise.all([
-          fetch("/api/taxis"),
-          fetch("/api/cantons"),
+        // Fetch conductores y cantones en paralelo con timeouts independientes
+        const [driversData, cantonsData] = await Promise.all([
+          fetchWithTimeout("/api/taxis", 10000),    // 10s timeout para taxis
+          fetchWithTimeout("/api/cantons", 8000),    // 8s timeout para cantones
         ]);
 
-        const driversData = await driversRes.json();
-        const cantonsData = await cantonsRes.json();
-
-        if (driversData.success) {
+        if (driversData?.success) {
           setDrivers(driversData.data);
         }
-        if (cantonsData.success) {
+        if (cantonsData?.success) {
           setCantons(cantonsData.data);
         }
       } catch (error) {
