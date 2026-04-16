@@ -355,16 +355,10 @@ export default function DriverDashboardPage() {
           });
           setRoutes(data.data.driverRoutes || []);
           // Handle schedules - prefer workingHours (new format) over schedules (old format)
-          console.log('🔍 Dashboard - Datos del driver:', {
-            workingHours: data.data.workingHours,
-            schedules: data.data.schedules,
-            isAvailable24h: data.data.isAvailable24h
-          });
           
           // Priorizar workingHours que tiene el formato nuevo { dayOfWeek, mode, slots }
           if (data.data.workingHours && Array.isArray(data.data.workingHours) && data.data.workingHours.length > 0) {
             // Use workingHours directly (new format with mode and slots)
-            console.log('🔍 Dashboard - Usando workingHours:', data.data.workingHours);
             setSchedules(data.data.workingHours);
           } else if (data.data.schedules && Array.isArray(data.data.schedules) && data.data.schedules.length > 0) {
             // Convert old format to new format
@@ -380,10 +374,8 @@ export default function DriverDashboardPage() {
               mode: s.isActive ? 'specific' as const : 'closed' as const,
               slots: s.isActive ? [{ id: Math.random().toString(36).substring(7), startTime: s.startTime, endTime: s.endTime }] : []
             }));
-            console.log('🔍 Dashboard - Horarios convertidos de formato antiguo:', convertedSchedules);
             setSchedules(convertedSchedules);
           } else {
-            console.log('🔍 Dashboard - Sin horarios guardados');
             setSchedules([]);
           }
           // Set 24h mode from data
@@ -395,7 +387,6 @@ export default function DriverDashboardPage() {
           // - Si no hay horarios guardados → is24h = true (modo flexible / sin horario fijo)
           const finalIs24h = !hasRealSchedules;
           setIs24h(finalIs24h);
-          console.log('🔍 Dashboard - hasRealSchedules:', hasRealSchedules, 'is24h final:', finalIs24h);
           setImagePreview(data.data.imageUrl || null);
           // Set service zones - MISMO NOMBRE que en Registro
           setServiceZonesWithExclusions(data.data.driverServiceZones || []);
@@ -658,8 +649,8 @@ export default function DriverDashboardPage() {
     }
 
     if (securityForm.newPassword) {
-      if (securityForm.newPassword.length < 6) {
-        setError("La nueva contraseña debe tener al menos 6 caracteres");
+      if (securityForm.newPassword.length < 8) {
+        setError("La nueva contraseña debe tener al menos 8 caracteres e incluir una letra y un número");
         return;
       }
       if (!securityForm.currentPassword) {

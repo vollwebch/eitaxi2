@@ -39,7 +39,6 @@ import {
   readFromStorage,
   type GPSState 
 } from "@/lib/gpsSync";
-import type { DaySchedule } from "@/components/ScheduleSelector";
 
 interface TrackingConfig {
   enabled: boolean;

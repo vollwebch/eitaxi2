@@ -45,18 +45,23 @@ export default function ServiceZonesManager({
     setZones(newZones);
     setNewZone("");
     
-    // Guardar en backend
+    // Guardar en backend via /api/drivers (PUT)
     setSaving(true);
     try {
-      await fetch("/api/driver/profile", {
+      const res = await fetch("/api/drivers", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          driverId,
-          serviceZones: newZones,
+          id: driverId,
+          serviceZones: JSON.stringify(newZones),
         }),
       });
-      onUpdate(newZones);
+      if (res.ok) {
+        onUpdate(newZones);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("Error saving zones:", err.error || res.statusText);
+      }
     } catch (error) {
       console.error("Error saving zones:", error);
     } finally {
@@ -70,15 +75,20 @@ export default function ServiceZonesManager({
     
     setSaving(true);
     try {
-      await fetch("/api/driver/profile", {
+      const res = await fetch("/api/drivers", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          driverId,
-          serviceZones: newZones,
+          id: driverId,
+          serviceZones: JSON.stringify(newZones),
         }),
       });
-      onUpdate(newZones);
+      if (res.ok) {
+        onUpdate(newZones);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("Error saving zones:", err.error || res.statusText);
+      }
     } catch (error) {
       console.error("Error saving zones:", error);
     } finally {
