@@ -159,12 +159,27 @@ export default function DirectChatDialog({
     }
   }, [conversationId]);
 
+  // Mark notifications for this conversation as read
+  const markConvNotificationsRead = useCallback(async () => {
+    if (!conversationId) return;
+    try {
+      await fetch("/api/client/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: conversationId }),
+      });
+    } catch {
+      // silent
+    }
+  }, [conversationId]);
+
   // Poll messages when conversation is ready
   useEffect(() => {
     if (conversationId) {
       initialLoadDone.current = false;
       setLoading(true);
       fetchMessages(false);
+      markConvNotificationsRead();
       setNewMessage("");
       pollIntervalRef.current = setInterval(() => fetchMessages(true), 15000);
     }

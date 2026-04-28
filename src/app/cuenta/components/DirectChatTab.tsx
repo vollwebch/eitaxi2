@@ -89,6 +89,19 @@ export default function DirectChatTab() {
     }
   }, []);
 
+  // Mark notifications for a conversation as read
+  const markConvNotificationsRead = useCallback(async (convId: string) => {
+    try {
+      await fetch("/api/client/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: convId }),
+      });
+    } catch {
+      // silent - non-critical
+    }
+  }, []);
+
   const fetchMessages = useCallback(async (conversationId: string, isPolling = false) => {
     if (!isPolling) setLoadingMessages(true);
     try {
@@ -98,10 +111,12 @@ export default function DirectChatTab() {
         if (isPolling) {
           // Only update if new messages arrived (avoid unnecessary re-renders)
           setMessages((prev) => {
-            if (prev.length === data.data.length && prev[prev.length - 1]?.id === data.data[data.data.length - 1]?.id) {
-              return prev;
-            }
-            return data.data;
+            const newData = data.data;
+            const hasNew = newData.length !== prev.length || prev[prev.length - 1]?.id !== newData[newData.length - 1]?.id;
+            if (!hasNew) return prev;
+            // New messages detected - also mark notifications as read
+            markConvNotificationsRead(conversationId);
+            return newData;
           });
         } else {
           setMessages(data.data);
@@ -126,6 +141,7 @@ export default function DirectChatTab() {
     if (selectedConversation) {
       initialLoadDone.current = false;
       fetchMessages(selectedConversation.id, false);
+      markConvNotificationsRead(selectedConversation.id);
       setNewMessage("");
       setTranslations({});
       pollIntervalRef.current = setInterval(

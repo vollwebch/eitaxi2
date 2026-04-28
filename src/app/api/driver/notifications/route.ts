@@ -31,12 +31,25 @@ export async function PATCH(request: NextRequest) {
   try {
     const session = await requireAuth(request);
     const body = await request.json();
-    const { id, isRead, all } = body;
+    const { id, isRead, all, conversationId } = body;
 
     // Mark ALL notifications as read
     if (all) {
       const result = await db.driverNotification.updateMany({
         where: { driverId: session.driverId, isRead: false },
+        data: { isRead: true },
+      });
+      return NextResponse.json({ success: true, updatedCount: result.count });
+    }
+
+    // Mark notifications for a specific conversation as read
+    if (conversationId) {
+      const result = await db.driverNotification.updateMany({
+        where: {
+          driverId: session.driverId,
+          isRead: false,
+          link: { contains: conversationId },
+        },
         data: { isRead: true },
       });
       return NextResponse.json({ success: true, updatedCount: result.count });

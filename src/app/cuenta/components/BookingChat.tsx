@@ -58,6 +58,20 @@ export default function BookingChat({
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translatingId, setTranslatingId] = useState<string | null>(null);
 
+  // Mark notifications for this booking as read
+  const markBookingNotificationsRead = useCallback(async () => {
+    if (!bookingId) return;
+    try {
+      await fetch("/api/client/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: bookingId }),
+      });
+    } catch {
+      // silent
+    }
+  }, [bookingId]);
+
   const fetchMessages = useCallback(async (isPolling = false) => {
     if (!bookingId) return;
     if (!isPolling) setLoading(true);
@@ -89,6 +103,7 @@ export default function BookingChat({
       initialLoadDone.current = false;
       setLoading(true);
       fetchMessages(false);
+      markBookingNotificationsRead();
       setNewMessage("");
 
       // Polling cada 15 segundos (invisible, sin spinner)

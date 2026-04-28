@@ -192,41 +192,43 @@ export default function DashboardChatTab({ driverId, onOpenBooking, onUnreadCoun
     }
   }, [autoOpenConvId, conversations]);
 
+  // Mark notifications for a conversation as read
+  const markConvNotificationsRead = useCallback(async (convId: string) => {
+    try {
+      await fetch("/api/driver/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: convId }),
+      });
+    } catch {
+      // silent - non-critical
+    }
+  }, []);
+
   // Fetch messages for selected conversation
   const fetchMessages = useCallback(async (conv: Conversation, isPolling = false) => {
     if (!isPolling) setLoadingChat(true);
     try {
+      let res, data;
       if (conv.type === 'booking') {
-        const res = await fetch(`/api/chat?bookingId=${conv.id}`);
-        const data = await res.json();
-        if (data.success) {
-          if (isPolling) {
-            setMessages((prev) => {
-              const newData = data.data;
-              if (prev.length === newData.length && prev[prev.length - 1]?.id === newData[newData.length - 1]?.id) {
-                return prev;
-              }
-              return newData;
-            });
-          } else {
-            setMessages(data.data);
-          }
-        }
+        res = await fetch(`/api/chat?bookingId=${conv.id}`);
+        data = await res.json();
       } else {
-        const res = await fetch(`/api/direct-chat/${conv.id}/messages`);
-        const data = await res.json();
-        if (data.success) {
-          if (isPolling) {
-            setMessages((prev) => {
-              const newData = data.data;
-              if (prev.length === newData.length && prev[prev.length - 1]?.id === newData[newData.length - 1]?.id) {
-                return prev;
-              }
-              return newData;
-            });
-          } else {
-            setMessages(data.data);
-          }
+        res = await fetch(`/api/direct-chat/${conv.id}/messages`);
+        data = await res.json();
+      }
+      if (data.success) {
+        if (isPolling) {
+          setMessages((prev) => {
+            const newData = data.data;
+            const hasNew = newData.length !== prev.length || prev[prev.length - 1]?.id !== newData[newData.length - 1]?.id;
+            if (!hasNew) return prev;
+            // New messages detected - also mark notifications as read
+            markConvNotificationsRead(conv.id);
+            return newData;
+          });
+        } else {
+          setMessages(data.data);
         }
       }
     } catch {
@@ -248,6 +250,7 @@ export default function DashboardChatTab({ driverId, onOpenBooking, onUnreadCoun
     if (!selectedConv) return;
     initialChatLoadDone.current = false;
     fetchMessages(selectedConv, false);
+    markConvNotificationsRead(selectedConv.id);
     const interval = setInterval(() => fetchMessages(selectedConv, true), 15000);
     return () => clearInterval(interval);
   }, [selectedConv, fetchMessages]);
