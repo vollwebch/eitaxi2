@@ -9,11 +9,21 @@ echo "========================================="
 
 cd /home/z/my-project
 
+# Step 0: Ensure static assets are available in standalone directory
+# (next build standalone doesn't include static files automatically)
+echo "[0/3] Ensuring static assets in standalone..."
+if [ -d ".next/static" ] && [ -d ".next/standalone" ]; then
+    cp -r .next/static .next/standalone/.next/static 2>/dev/null
+    cp -r public .next/standalone/public 2>/dev/null
+    echo "  Static assets copied."
+fi
+
 # Export PM2 home
 export PM2_HOME="/home/z/.pm2"
 
 # Step 1: Start PM2 with our app
 echo "[1/3] Starting PM2 application..."
+
 if pm2 describe eitaxi > /dev/null 2>&1; then
     echo "  App exists in PM2, restarting..."
     pm2 restart eitaxi
