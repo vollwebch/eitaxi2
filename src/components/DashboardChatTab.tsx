@@ -251,7 +251,7 @@ export default function DashboardChatTab({ driverId, onOpenBooking, onUnreadCoun
     initialChatLoadDone.current = false;
     fetchMessages(selectedConv, false);
     markConvNotificationsRead(selectedConv.id);
-    const interval = setInterval(() => fetchMessages(selectedConv, true), 20000);
+    const interval = setInterval(() => fetchMessages(selectedConv, true), 8000);
     return () => clearInterval(interval);
   }, [selectedConv, fetchMessages]);
 

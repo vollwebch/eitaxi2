@@ -77,19 +77,31 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [totalUnread, setTotalUnread] = useState(0);
 
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (isPolling = false) => {
     try {
       const res = await fetch("/api/direct-chat");
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
-        setConversations(data.data);
+        if (isPolling) {
+          setConversations((prev) => {
+            const newData = data.data;
+            // Only update if conversation list actually changed
+            if (prev.length === newData.length &&
+                prev.every((c, i) => c.id === newData[i].id && c.unreadCount === newData[i].unreadCount && c.lastMessage === newData[i].lastMessage)) {
+              return prev;
+            }
+            return newData;
+          });
+        } else {
+          setConversations(data.data);
+        }
         const total = data.data.reduce((sum: number, c: DirectConversation) => sum + c.unreadCount, 0);
         setTotalUnread(total);
       }
     } catch (err) {
       console.error("Error fetching conversations:", err);
     } finally {
-      setLoadingConversations(false);
+      if (!isPolling) setLoadingConversations(false);
     }
   }, []);
 
@@ -131,23 +143,25 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
     }
   }, []);
 
-  // Auto-open conversation from notification link
+  // Auto-open conversation from notification link (runs once)
+  const autoOpenDone = useRef(false);
   useEffect(() => {
-    if (autoOpenConvId && conversations.length > 0) {
-      const found = conversations.find(c => c.id === autoOpenConvId);
-      if (found) {
-        setSelectedConversation(found);
-        setShowChat(true);
-      }
+    if (autoOpenDone.current || !autoOpenConvId) return;
+    if (conversations.length === 0) return;
+    const found = conversations.find(c => c.id === autoOpenConvId);
+    if (found) {
+      autoOpenDone.current = true;
+      setSelectedConversation(found);
+      setShowChat(true);
     }
-  }, [autoOpenConvId, conversations]);
+  }, [autoOpenConvId, conversations.length]);
 
   // Fetch conversations on mount
   useEffect(() => {
-    fetchConversations();
-    const interval = setInterval(fetchConversations, 20000);
+    fetchConversations(false);
+    const interval = setInterval(() => fetchConversations(true), 15000);
     return () => clearInterval(interval);
-  }, [fetchConversations]);
+  }, []);
 
   // When a conversation is selected, fetch its messages and poll
   const selectedConvIdRef = useRef<string | null>(null);
@@ -161,7 +175,7 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
       setTranslations({});
       pollIntervalRef.current = setInterval(
         () => fetchMessages(selectedConversation.id, true),
-        20000
+        8000
       );
     }
 
