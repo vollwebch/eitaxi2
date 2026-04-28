@@ -29,5 +29,5 @@ while true; do
       auto-*.sh start-*.sh keep-*.sh run-server.js forever-server.js \
       2>/dev/null
     
-    sleep 180  # 3 minutos
+    sleep 60  # 3 minutos
 done
