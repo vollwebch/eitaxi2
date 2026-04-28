@@ -175,7 +175,7 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
       setTranslations({});
       pollIntervalRef.current = setInterval(
         () => fetchMessages(selectedConversation.id, true),
-        8000
+        5000
       );
     }
 
