@@ -16,14 +16,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { driverId, currentPassword, newEmail, newPassword } = body
+    const { currentPassword, newEmail, newPassword } = body
 
-    if (body.driverId && body.driverId !== session.driverId) {
-      return NextResponse.json(
-        { success: false, error: 'Acceso no autorizado' },
-        { status: 403 }
-      )
-    }
+    // Force ownership: always use session.driverId, ignore body.driverId
+    const driverId = session.driverId
 
     // 🔒 No se registran datos de seguridad en producción
     // Solo se loguea en desarrollo para debugging

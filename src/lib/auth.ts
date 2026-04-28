@@ -1,5 +1,14 @@
 import { SignJWT, jwtVerify } from 'jose';
-import { cookies } from 'next/headers';
+
+/**
+ * Read a cookie value from a Request object's Cookie header.
+ * Safe for all contexts including standalone mode.
+ */
+function getCookieFromRequest(request: Request, name: string): string | null {
+  const cookieHeader = request.headers.get('cookie') || '';
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
 
 const SESSION_COOKIE_NAME = 'eitaxi_session_token';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 días
@@ -55,9 +64,21 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   }
 }
 
-// Obtener la sesión actual desde las cookies (server-side)
+// Obtener la sesión actual desde un Request object (safe for standalone)
+export async function getSessionFromRequest(request: Request): Promise<SessionPayload | null> {
+  try {
+    const token = getCookieFromRequest(request, SESSION_COOKIE_NAME);
+    if (!token) return null;
+    return await verifySessionToken(token);
+  } catch {
+    return null;
+  }
+}
+
+// Obtener la sesión actual desde las cookies (server-side) - legacy, may crash in standalone
 export async function getServerSession(): Promise<SessionPayload | null> {
   try {
+    const { cookies } = await import('next/headers');
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     if (!token) return null;
@@ -68,9 +89,28 @@ export async function getServerSession(): Promise<SessionPayload | null> {
 }
 
 // Verificar autenticación en API routes - devuelve la sesión o lanza error
+// IMPORTANT: Always pass `request` parameter to avoid cookies() crash in standalone
 export async function requireAuth(request?: Request): Promise<SessionPayload> {
-  // Intentar desde cookies (para server components / API routes)
+  // 1. Try from Request object first (most reliable in all contexts)
+  if (request) {
+    // Try session cookie
+    const token = getCookieFromRequest(request, SESSION_COOKIE_NAME);
+    if (token) {
+      const session = await verifySessionToken(token);
+      if (session) return session;
+    }
+    // Try Bearer token
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+      const bearerToken = authHeader.slice(7);
+      const session = await verifySessionToken(bearerToken);
+      if (session) return session;
+    }
+  }
+
+  // 2. Last resort: try cookies() API (may crash in standalone)
   try {
+    const { cookies } = await import('next/headers');
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
     if (token) {
@@ -81,16 +121,6 @@ export async function requireAuth(request?: Request): Promise<SessionPayload> {
     // cookies() puede fallar fuera de un contexto de request
   }
 
-  // Fallback: leer desde header Authorization
-  if (request) {
-    const authHeader = request.headers.get('Authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      const session = await verifySessionToken(token);
-      if (session) return session;
-    }
-  }
-
   throw new Error('No autenticado');
 }
 
@@ -99,7 +129,7 @@ export const sessionCookieOptions = {
   name: SESSION_COOKIE_NAME,
   httpOnly: true,
   secure: false,
-  sameSite: 'strict' as const,
+  sameSite: 'lax' as const,
   maxAge: SESSION_MAX_AGE,
   path: '/',
 };

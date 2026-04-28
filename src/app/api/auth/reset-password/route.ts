@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { db } from '@/lib/db'
+import { sendResetPasswordEmail } from '@/lib/email'
 
 // POST - Solicitar reset de contraseña (envía email con token)
 export async function POST(request: NextRequest) {
@@ -47,17 +48,17 @@ export async function POST(request: NextRequest) {
     // Por ahora, devolvemos el token para que se pueda usar directamente
     const resetUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://eitaxi.ch'}/restablecer-password/${resetToken}`
 
-    console.log('==========================================')
-    console.log('📧 PASSWORD RESET para:', driver.email)
-    console.log('🔗 URL:', resetUrl)
-    console.log('==========================================')
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📧 PASSWORD RESET para:', driver.email)
+      console.log('🔗 URL:', resetUrl)
+    }
 
-    // TODO: Enviar email real con el enlace
-    // await sendEmail({
-    //   to: driver.email,
-    //   subject: 'Restablece tu contraseña - eitaxi',
-    //   body: `Haz clic en este enlace para restablecer tu contraseña: ${resetUrl}`
-    // })
+    // Enviar email real con el enlace de restablecimiento
+    await sendResetPasswordEmail({
+      to: driver.email,
+      name: driver.name,
+      resetUrl,
+    });
 
     return NextResponse.json({
       success: true,

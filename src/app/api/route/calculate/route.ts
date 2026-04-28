@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
         originCoords = { lat: city.latitude, lng: city.longitude }
       }
     } else if (from.placeId) {
-      const place = await db.place.findUnique({ where: { id: from.placeId } })
+      const place = await db.location.findUnique({ where: { id: from.placeId } })
       if (place) {
         originCoords = { lat: place.latitude, lng: place.longitude }
       }
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         destCoords = { lat: city.latitude, lng: city.longitude }
       }
     } else if (to.placeId) {
-      const place = await db.place.findUnique({ where: { id: to.placeId } })
+      const place = await db.location.findUnique({ where: { id: to.placeId } })
       if (place) {
         destCoords = { lat: place.latitude, lng: place.longitude }
       }

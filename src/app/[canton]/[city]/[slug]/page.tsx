@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   Phone,
   MessageCircle,
@@ -95,36 +97,42 @@ interface LiveLocation {
 }
 
 // Service config
-const serviceConfig: Record<string, { icon: typeof Car; label: string; description: string }> = {
-  airport: { icon: Plane, label: "Aeropuerto", description: "Traslados al aeropuerto" },
-  city: { icon: Building2, label: "Ciudad", description: "Viajes urbanos" },
-  long_distance: { icon: Route, label: "Larga distancia", description: "Viajes interurbanos" },
-  limousine: { icon: Car, label: "Limusina", description: "Servicio de lujo" },
-  corporate: { icon: Shield, label: "Corporativo", description: "Empresas y ejecutivos" },
-  events: { icon: Calendar, label: "Eventos", description: "Bodas y celebraciones" },
-  delivery: { icon: Route, label: "Entregas", description: "Mensajería y paquetería" },
-  night: { icon: Clock, label: "Nocturno", description: "Servicio de noche" },
-};
+function getServiceConfig(tServices: ReturnType<typeof useTranslations>, t: ReturnType<typeof useTranslations>): Record<string, { icon: typeof Car; label: string; description: string }> {
+  return {
+    airport: { icon: Plane, label: tServices('airport'), description: t('serviceDesc.airport') },
+    city: { icon: Building2, label: tServices('city'), description: t('serviceDesc.city') },
+    long_distance: { icon: Route, label: tServices('long_distance'), description: t('serviceDesc.long_distance') },
+    limousine: { icon: Car, label: tServices('limousine'), description: t('serviceDesc.limousine') },
+    corporate: { icon: Shield, label: tServices('corporate'), description: t('serviceDesc.corporate') },
+    events: { icon: Calendar, label: tServices('events'), description: t('serviceDesc.events') },
+    delivery: { icon: Route, label: tServices('delivery'), description: t('serviceDesc.delivery') },
+    night: { icon: Clock, label: tServices('night'), description: t('serviceDesc.night') },
+  };
+}
 
 // Language config
-const languageConfig: Record<string, { flag: string; name: string }> = {
-  de: { flag: "🇩🇪", name: "Alemán" },
-  en: { flag: "🇬🇧", name: "Inglés" },
-  fr: { flag: "🇫🇷", name: "Francés" },
-  it: { flag: "🇮🇹", name: "Italiano" },
-  es: { flag: "🇪🇸", name: "Español" },
-  pt: { flag: "🇵🇹", name: "Portugués" },
-  ru: { flag: "🇷🇺", name: "Ruso" },
-  zh: { flag: "🇨🇳", name: "Chino" },
-};
+function getLanguageConfig(t: ReturnType<typeof useTranslations>): Record<string, { flag: string; name: string }> {
+  return {
+    de: { flag: "🇩🇪", name: t('language.de') },
+    en: { flag: "🇬🇧", name: t('language.en') },
+    fr: { flag: "🇫🇷", name: t('language.fr') },
+    it: { flag: "🇮🇹", name: t('language.it') },
+    es: { flag: "🇪🇸", name: t('language.es') },
+    pt: { flag: "🇵🇹", name: t('language.pt') },
+    ru: { flag: "🇷🇺", name: t('language.ru') },
+    zh: { flag: "🇨🇳", name: t('language.zh') },
+  };
+}
 
 // Vehicle type config
-const vehicleTypeConfig: Record<string, { label: string; icon: string }> = {
-  taxi: { label: "Taxi", icon: "🚕" },
-  limousine: { label: "Limusina", icon: "🚗" },
-  van: { label: "Van", icon: "🚐" },
-  premium: { label: "Premium", icon: "✨" },
-};
+function getVehicleTypeConfig(tVT: ReturnType<typeof useTranslations>): Record<string, { label: string; icon: string }> {
+  return {
+    taxi: { label: tVT('taxi'), icon: "🚕" },
+    limousine: { label: tVT('limousine'), icon: "🚗" },
+    van: { label: tVT('van'), icon: "🚐" },
+    premium: { label: tVT('premium'), icon: "✨" },
+  };
+}
 
 // Mapa dinámico para el tracking
 const DriverLiveMap = dynamic(() => import('./LiveMap'), {
@@ -144,6 +152,19 @@ export default function DriverProfilePage() {
   const [liveLocation, setLiveLocation] = useState<LiveLocation | null>(null);
   const [showLiveMap, setShowLiveMap] = useState(false);
 
+  // Translation hooks
+  const t = useTranslations('profile');
+  const tDrivers = useTranslations('drivers');
+  const tCommon = useTranslations('common');
+  const tServices = useTranslations('services');
+  const tVehicleTypes = useTranslations('vehicleTypes');
+  const tSearch = useTranslations('search');
+  const tFooter = useTranslations('footer');
+
+  const serviceConfig = getServiceConfig(tServices, t);
+  const languageConfig = getLanguageConfig(t);
+  const vehicleTypeConfig = getVehicleTypeConfig(tVehicleTypes);
+
   useEffect(() => {
     const fetchDriver = async () => {
       try {
@@ -155,10 +176,10 @@ export default function DriverProfilePage() {
         if (data.success) {
           setDriver(data.data);
         } else {
-          setError(data.error || "Conductor no encontrado");
+          setError(data.error || t('notFound'));
         }
       } catch (err) {
-        setError("Error al cargar el perfil");
+        setError(tCommon('error'));
       } finally {
         setLoading(false);
       }
@@ -247,14 +268,14 @@ export default function DriverProfilePage() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full p-8 text-center border-border">
           <Car className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Conductor no encontrado</h1>
+          <h1 className="text-2xl font-bold mb-2">{t('notFound')}</h1>
           <p className="text-muted-foreground mb-6">
-            {error || "El perfil que buscas no existe o ha sido eliminado."}
+            {error || t('notFound')}
           </p>
           <Link href="/">
             <Button className="bg-yellow-400 text-black hover:bg-yellow-500">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver al inicio
+              {tCommon('back')}
             </Button>
           </Link>
         </Card>
@@ -288,6 +309,7 @@ export default function DriverProfilePage() {
 
             {/* Actions */}
             <div className="flex items-center gap-1 sm:gap-2">
+              <LanguageSwitcher />
               <Button variant="ghost" size="icon" onClick={handleShare}>
                 <Share2 className="h-5 w-5" />
               </Button>
@@ -297,7 +319,7 @@ export default function DriverProfilePage() {
                 size="sm"
               >
                 <Phone className="sm:mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Llamar ahora</span>
+                <span className="hidden sm:inline">{tDrivers('call')}</span>
               </Button>
             </div>
           </div>
@@ -334,25 +356,25 @@ export default function DriverProfilePage() {
                 {driver.isAvailable24h && (
                   <Badge className="bg-green-500/90 text-white border-0 text-sm">
                     <Clock className="mr-1.5 h-4 w-4" />
-                    Disponible 24/7
+                    {t('available247')}
                   </Badge>
                 )}
                 <Badge variant="secondary" className="text-sm bg-background/80 backdrop-blur-sm">
                   <span className="mr-1.5">{primaryVehicleInfo.icon}</span>
                   {vehicleTypesList.length > 1 
-                    ? `${primaryVehicleInfo.label} +${vehicleTypesList.length - 1}` 
-                    : primaryVehicleInfo.label}
+                    ? `${tVehicleTypes(vehicleTypesList[0])} +${vehicleTypesList.length - 1}` 
+                    : tVehicleTypes(vehicleTypesList[0])}
                 </Badge>
                 {driver.isVerified && (
                   <Badge className="bg-blue-500/90 text-white border-0 text-sm">
                     <CheckCircle className="mr-1.5 h-4 w-4" />
-                    Verificado
+                    {t('verifiedBadge')}
                   </Badge>
                 )}
                 {driver.isTopRated && (
                   <Badge className="bg-yellow-400/90 text-black border-0 text-sm">
                     <Award className="mr-1.5 h-4 w-4" />
-                    Top Taxi
+                    {t('topTaxi')}
                   </Badge>
                 )}
               </div>
@@ -380,26 +402,26 @@ export default function DriverProfilePage() {
               <div className="text-3xl md:text-4xl font-bold text-yellow-400">
                 {driver.experience}+
               </div>
-              <div className="text-sm text-muted-foreground mt-1">Años de experiencia</div>
+              <div className="text-sm text-muted-foreground mt-1">{t('experience')}</div>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center gap-1">
                 <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
                 <span className="text-3xl md:text-4xl font-bold">{driver.rating.toFixed(1)}</span>
               </div>
-              <div className="text-sm text-muted-foreground mt-1">Valoración</div>
+              <div className="text-sm text-muted-foreground mt-1">{t('rating')}</div>
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-bold text-yellow-400">
                 {driver.views}+
               </div>
-              <div className="text-sm text-muted-foreground mt-1">Clientes contactados</div>
+              <div className="text-sm text-muted-foreground mt-1">{t('clientsContacted')}</div>
             </div>
             <div className="text-center">
               <div className="text-3xl md:text-4xl font-bold text-yellow-400">
                 100%
               </div>
-              <div className="text-sm text-muted-foreground mt-1">Confiabilidad</div>
+              <div className="text-sm text-muted-foreground mt-1">{t('reliability')}</div>
             </div>
           </div>
         </div>
@@ -416,7 +438,7 @@ export default function DriverProfilePage() {
                 <CardContent className="p-6">
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     <Zap className="h-5 w-5 text-yellow-400" />
-                    Servicios
+                    {t('services')}
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {(driver.services || []).map((serviceId) => {
@@ -432,7 +454,7 @@ export default function DriverProfilePage() {
                             <Icon className="h-5 w-5 text-yellow-400" />
                           </div>
                           <div>
-                            <div className="font-medium">{service.label}</div>
+                            <div className="font-medium">{tServices(serviceId as any)}</div>
                             <div className="text-sm text-muted-foreground">
                               {service.description}
                             </div>
@@ -448,7 +470,7 @@ export default function DriverProfilePage() {
               {driver.description && (
                 <Card className="border-border bg-card">
                   <CardContent className="p-6">
-                    <h2 className="text-xl font-semibold mb-4">Sobre {driver.name}</h2>
+                    <h2 className="text-xl font-semibold mb-4">{t('about', { name: driver.name })}</h2>
                     <p className="text-muted-foreground leading-relaxed text-lg">
                       {driver.description}
                     </p>
@@ -461,7 +483,7 @@ export default function DriverProfilePage() {
                 <CardContent className="p-6">
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     <Car className="h-5 w-5 text-yellow-400" />
-                    {driver.vehicles && driver.vehicles.length > 1 ? 'Vehículos' : 'Vehículo'}
+                    {t('vehicle')}
                   </h2>
                   
                   {/* Si hay vehículos en la nueva tabla */}
@@ -483,21 +505,21 @@ export default function DriverProfilePage() {
                               <div className="font-medium text-lg flex flex-wrap items-center gap-2">
                                 {vehicle.brand} {vehicle.model}
                                 <Badge variant="outline" className="text-xs">
-                                  {typeInfo.label}
+                                  {tVehicleTypes(vehicle.vehicleType as any)}
                                 </Badge>
                                 {vehicle.isPrimary && (
                                   <Badge className="bg-yellow-400 text-black text-xs">
-                                    Principal
+                                    {t('primaryVehicle')}
                                   </Badge>
                                 )}
                               </div>
                               <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                                {vehicle.year && <span>Año: {vehicle.year}</span>}
-                                {vehicle.color && <span>Color: {vehicle.color}</span>}
+                                {vehicle.year && <span>{t('yearLabel', { year: vehicle.year })}</span>}
+                                {vehicle.color && <span>{t('colorLabel', { color: vehicle.color })}</span>}
                                 {vehicle.passengerCapacity && (
                                   <span className="flex items-center gap-1">
                                     <Users className="h-3 w-3" />
-                                    {vehicle.passengerCapacity} pasajeros
+                                    {t('passengers', { count: vehicle.passengerCapacity })}
                                   </span>
                                 )}
                               </div>
@@ -520,20 +542,20 @@ export default function DriverProfilePage() {
                         <div className="font-medium text-lg flex flex-wrap items-center gap-2">
                           {driver.vehicleBrand} {driver.vehicleModel}
                           <div className="flex flex-wrap gap-1">
-                            {vehicleInfos.map((vi, idx) => (
+                            {vehicleTypesList.map((vt, idx) => (
                               <Badge key={idx} variant="outline" className="text-xs">
-                                {vi.label}
+                                {tVehicleTypes(vt as any)}
                               </Badge>
                             ))}
                           </div>
                         </div>
                         <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-1 mt-1">
-                          {driver.vehicleYear && <span>Año: {driver.vehicleYear}</span>}
-                          {driver.vehicleColor && <span>Color: {driver.vehicleColor}</span>}
+                          {driver.vehicleYear && <span>{t('yearLabel', { year: driver.vehicleYear })}</span>}
+                          {driver.vehicleColor && <span>{t('colorLabel', { color: driver.vehicleColor })}</span>}
                           {driver.passengerCapacity && (
                             <span className="flex items-center gap-1">
                               <Users className="h-3 w-3" />
-                              {driver.passengerCapacity} pasajeros
+                              {t('passengers', { count: driver.passengerCapacity })}
                             </span>
                           )}
                         </div>
@@ -549,7 +571,7 @@ export default function DriverProfilePage() {
                   <CardContent className="p-6">
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <Navigation className="h-5 w-5 text-yellow-400" />
-                      Zonas de servicio
+                      {t('serviceZones')}
                     </h2>
                     <div className="flex flex-wrap gap-2">
                       {driver.serviceZones.map((zone, index) => (
@@ -581,7 +603,7 @@ export default function DriverProfilePage() {
               {/* Contact Card - Solo sticky en desktop para evitar overlap */}
               <Card className="border-yellow-400/30 bg-gradient-to-br from-yellow-400/10 to-transparent lg:sticky lg:top-24 lg:z-10">
                 <CardContent className="p-6">
-                  <h3 className="font-semibold mb-4">Contactar</h3>
+                  <h3 className="font-semibold mb-4">{t('contactDriver')}</h3>
                   
                   {/* CTA Buttons */}
                   <div className="space-y-3">
@@ -590,7 +612,7 @@ export default function DriverProfilePage() {
                       onClick={handleCall}
                     >
                       <Phone className="mr-2 h-5 w-5" />
-                      Llamar ahora
+                      {tDrivers('call')}
                     </Button>
                     <Button
                       variant="outline"
@@ -598,13 +620,13 @@ export default function DriverProfilePage() {
                       onClick={handleWhatsApp}
                     >
                       <MessageCircle className="mr-2 h-5 w-5" />
-                      WhatsApp
+                      {tCommon('whatsapp')}
                     </Button>
                   </div>
 
                   {/* Phone number */}
                   <div className="mt-4 pt-4 border-t border-border">
-                    <div className="text-sm text-muted-foreground">Teléfono</div>
+                    <div className="text-sm text-muted-foreground">{t('phoneLabel')}</div>
                     <a
                       href={`tel:${driver.phone}`}
                       className="text-lg font-medium text-yellow-400 hover:underline"
@@ -618,10 +640,10 @@ export default function DriverProfilePage() {
                     <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
                       <div className="flex items-center gap-2 text-green-500">
                         <Clock className="h-4 w-4" />
-                        <span className="font-medium">Disponible ahora</span>
+                        <span className="font-medium">{t('availableNow')}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Servicio 24 horas, 7 días
+                        {t('service24h')}
                       </p>
                     </div>
                   )}
@@ -634,7 +656,7 @@ export default function DriverProfilePage() {
                   <CardContent className="p-6">
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
                       <Globe className="h-5 w-5 text-yellow-400" />
-                      Idiomas
+                      {t('languages')}
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {driver.languages.map((langId) => {
@@ -661,12 +683,12 @@ export default function DriverProfilePage() {
                 <CardContent className="p-6">
                   <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-yellow-400" />
-                    Ubicación
+                    {t('locationLabel')}
                   </h3>
                   <div className="space-y-2">
                     <div className="font-medium">{driver.city.name}</div>
                     <div className="text-muted-foreground">
-                      {driver.canton.name}, Suiza
+                      {driver.canton.name}, {tSearch('switzerland')}
                     </div>
                   </div>
                 </CardContent>
@@ -679,10 +701,10 @@ export default function DriverProfilePage() {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-semibold flex items-center gap-2">
                         <Radio className="h-5 w-5 text-red-500 animate-pulse" />
-                        Ubicación en vivo
+                        {t('liveLocation')}
                       </h3>
                       <Badge className="bg-red-500/20 text-red-400 border-red-500/30 animate-pulse">
-                        En vivo
+                        {t('live')}
                       </Badge>
                     </div>
 
@@ -693,7 +715,7 @@ export default function DriverProfilePage() {
                           <>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Clock className="h-4 w-4" />
-                              Actualizado hace {liveLocation.age < 60 ? `${liveLocation.age}s` : '1 min'}
+                              {t('updatedAgo', { time: liveLocation.age < 60 ? `${liveLocation.age}s` : '1 min' })}
                             </div>
                             {liveLocation.speed && (
                               <div className="flex items-center gap-2 text-sm">
@@ -704,7 +726,7 @@ export default function DriverProfilePage() {
                           </>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            Obteniendo ubicación...
+                            {t('gettingLocation')}
                           </p>
                         )}
                         <div className="flex gap-2">
@@ -715,12 +737,12 @@ export default function DriverProfilePage() {
                             onClick={() => setShowLiveMap(true)}
                           >
                             <MapPin className="mr-1 h-4 w-4" />
-                            Ver mapa
+                            {t('viewMap')}
                           </Button>
                           <Link href={`/track/${driver.id}`} className="flex-1">
                             <Button size="sm" className="w-full bg-red-500 hover:bg-red-600">
                               <ExternalLink className="mr-1 h-4 w-4" />
-                              Pantalla completa
+                              {t('fullscreen')}
                             </Button>
                           </Link>
                         </div>
@@ -743,12 +765,12 @@ export default function DriverProfilePage() {
                             size="sm"
                             onClick={() => setShowLiveMap(false)}
                           >
-                            Ocultar mapa
+                            {t('hideMap')}
                           </Button>
                           <Link href={`/track/${driver.id}`}>
                             <Button size="sm" variant="outline">
                               <ExternalLink className="mr-1 h-4 w-4" />
-                              Pantalla completa
+                              {t('fullscreen')}
                             </Button>
                           </Link>
                         </div>
@@ -770,7 +792,7 @@ export default function DriverProfilePage() {
             onClick={handleCall}
           >
             <Phone className="mr-2 h-5 w-5" />
-            Llamar
+            {tDrivers('call')}
           </Button>
           <Button
             variant="outline"
@@ -778,7 +800,7 @@ export default function DriverProfilePage() {
             onClick={handleWhatsApp}
           >
             <MessageCircle className="mr-2 h-5 w-5" />
-            WhatsApp
+            {tCommon('whatsapp')}
           </Button>
         </div>
       </div>
@@ -800,16 +822,16 @@ export default function DriverProfilePage() {
             {/* Enlaces legales */}
             <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
               <Link href="/privacidad" className="text-muted-foreground hover:text-foreground transition-colors">
-                Política de Privacidad
+                {t('privacyPolicy')}
               </Link>
               <span className="text-muted-foreground/50">•</span>
               <Link href="/terminos" className="text-muted-foreground hover:text-foreground transition-colors">
-                Términos de Servicio
+                {t('termsOfService')}
               </Link>
             </div>
             
             <p className="text-sm text-muted-foreground">
-              © 2026 eitaxi. Todos los derechos reservados.
+              {tFooter('copyright', { year: new Date().getFullYear() })}
             </p>
           </div>
         </div>

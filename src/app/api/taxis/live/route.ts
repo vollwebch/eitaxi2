@@ -9,6 +9,15 @@ import {
   getMunicipalitiesByDistrict
 } from '@/lib/geo-data'
 
+/** Safely parse JSON strings – returns fallback on malformed input */
+function safeJsonParse<T>(value: unknown, fallback: T): T {
+  try {
+    return JSON.parse(value as string) as T
+  } catch {
+    return fallback
+  }
+}
+
 // ============================================
 // API para obtener taxis con GPS activo en tiempo real
 // Lógica basada en ZONAS y RUTAS del taxista
@@ -277,11 +286,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ...cached, fromCache: true })
     }
 
-    // Obtener conductores activos
-    // Incluir tanto los que tienen GPS activo como los que no (usar ubicación base)
+    // Obtener conductores con tracking activo
     const drivers = await db.taxiDriver.findMany({
       where: {
         isActive: true,
+        trackingEnabled: true,
       },
       include: {
         city: true,
@@ -302,42 +311,19 @@ export async function GET(request: NextRequest) {
     const taxisWithLocation: any[] = []
 
     for (const driver of drivers) {
-      // Verificar horario para conductores con tracking
-      if (driver.trackingEnabled && !checkSchedule(driver.trackingMode, driver.trackingSchedule)) {
+      if (!checkSchedule(driver.trackingMode, driver.trackingSchedule)) {
         continue
       }
 
-      // Determinar ubicación: GPS real-time o base de la ciudad
       const lastLocation = driver.locations[0]
-      let driverLat: number, driverLon: number, locationAge: number, locationType: string
+      if (!lastLocation) continue
 
-      if (lastLocation && driver.trackingEnabled) {
-        // GPS real-time: usar solo si es reciente (últimos 5 minutos)
-        locationAge = Date.now() - lastLocation.createdAt.getTime()
-        if (locationAge > 5 * 60 * 1000) {
-          // GPS stale - usar ubicación base
-          if (!driver.latitude || !driver.longitude) continue
-          driverLat = driver.latitude
-          driverLon = driver.longitude
-          locationAge = 0
-          locationType = 'base'
-        } else {
-          driverLat = lastLocation.latitude
-          driverLon = lastLocation.longitude
-          locationType = 'gps'
-        }
-      } else {
-        // Sin GPS - usar ubicación base (ciudad del conductor)
-        if (!driver.latitude || !driver.longitude) continue
-        driverLat = driver.latitude
-        driverLon = driver.longitude
-        locationAge = 0
-        locationType = 'base'
-      }
+      const locationAge = Date.now() - lastLocation.createdAt.getTime()
+      if (locationAge > 2 * 60 * 1000) continue
 
       const distanceToClient = calculateDistance(
         clientLat, clientLon,
-        driverLat, driverLon
+        lastLocation.latitude, lastLocation.longitude
       )
 
       if (distanceToClient > radius) continue
@@ -347,17 +333,17 @@ export async function GET(request: NextRequest) {
       
       if (driver.city?.latitude && driver.city?.longitude) {
         distanceFromBase = calculateDistance(
-          driverLat, driverLon,
+          lastLocation.latitude, lastLocation.longitude,
           driver.city.latitude, driver.city.longitude
         )
-        isInBaseZone = distanceFromBase <= (driver.operationRadius || 15)
+        isInBaseZone = distanceFromBase <= 15
       }
 
       // Procesar zonas de servicio
       const serviceZones = driver.driverServiceZones.map(z => ({
         zoneName: z.zoneName,
         zoneType: z.zoneType,
-        exclusions: JSON.parse(z.exclusions || '[]')
+        exclusions: safeJsonParse(z.exclusions || '[]', [])
       }))
 
       // Procesar rutas
@@ -407,7 +393,8 @@ export async function GET(request: NextRequest) {
         id: driver.id,
         name: driver.name,
         slug: driver.slug,
-        // 🔒 phone y whatsapp no expuestos en API pública (nDSG)
+        phone: driver.phone,
+        whatsapp: driver.whatsapp,
         imageUrl: driver.imageUrl,
         rating: driver.rating,
         reviewCount: driver.reviewCount,
@@ -420,11 +407,10 @@ export async function GET(request: NextRequest) {
         vehicleYear: driver.vehicleYear,
         
         location: {
-          latitude: driverLat,
-          longitude: driverLon,
-          timestamp: lastLocation?.createdAt?.toISOString() || new Date().toISOString(),
+          latitude: lastLocation.latitude,
+          longitude: lastLocation.longitude,
+          timestamp: lastLocation.createdAt.toISOString(),
           age: Math.round(locationAge / 1000),
-          type: locationType || 'base',
         },
         
         baseCity: {
@@ -444,8 +430,8 @@ export async function GET(request: NextRequest) {
         matchedDestinations,
         availabilityReason,
         
-        services: JSON.parse(driver.services),
-        languages: JSON.parse(driver.languages),
+        services: safeJsonParse(driver.services, []),
+        languages: safeJsonParse(driver.languages, []),
       })
     }
 

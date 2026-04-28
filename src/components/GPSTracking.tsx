@@ -25,6 +25,9 @@ import {
   AlertTriangle,
   Sun,
   Edit3,
+  RefreshCw,
+  Monitor,
+  Globe,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,13 +36,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { useTranslations } from "next-intl";
 import {
   subscribeToGPS, 
   broadcastGPSState, 
   readFromStorage,
   type GPSState 
 } from "@/lib/gpsSync";
-
 interface TrackingConfig {
   enabled: boolean;
   mode: "always" | "schedule";
@@ -84,6 +87,7 @@ export default function GPSTracking({
   onIs24hChange,
   onNavigateToSchedules
 }: GPSTrackingProps) {
+  const t = useTranslations();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [tracking, setTracking] = useState<TrackingConfig>({
@@ -119,7 +123,14 @@ export default function GPSTracking({
   // GPS Consent state
   const [showGpsConsent, setShowGpsConsent] = useState(false);
   const [hasGpsConsent, setHasGpsConsent] = useState(false);
-  
+
+  // GPS permission denied state
+  const [gpsPermissionDenied, setGpsPermissionDenied] = useState(false);
+  const [showPermissionHelp, setShowPermissionHelp] = useState(false);
+
+  // GPS browser permission state: granted | denied | prompt | unsupported
+  const [gpsPermissionState, setGpsPermissionState] = useState<'granted' | 'denied' | 'prompt' | 'unsupported' | null>(null);
+
   // Schedule mode state - para mostrar/ocultar horarios fijos
   const [showFixedSchedules, setShowFixedSchedules] = useState(false);
 
@@ -137,9 +148,8 @@ export default function GPSTracking({
   const gpsActiveRef = useRef(false);
   const trackingEnabledRef = useRef(false);
   const currentPositionRef = useRef<{ lat: number; lng: number } | null>(null);
-
-  // Ref para rastrear si ya hemos recibido horarios externos (para evitar que la API los sobrescriba)
-  const hasExternalSchedulesRef = useRef(false);
+  const schedulesRef = useRef(tracking.schedule);
+  const is24hRef = useRef(is24h);
 
   // Convertir horarios del tab "Horarios" al formato del GPS
   const convertSchedulesToGPSFormat = useCallback((schedules: DaySchedule[]) => {
@@ -180,26 +190,17 @@ export default function GPSTracking({
     }
   }, [is24h, loading]);
 
-  // Actualizar tracking cuando cambian los horarios externos
+  // Actualizar tracking cuando cambian los horarios externos (FUENTE DE VERDAD: workingHours)
   useEffect(() => {
-    // Solo sincronizar si tenemos horarios externos válidos
-    if (!externalSchedules || externalSchedules.length === 0) {
-      return;
-    }
-
-    const gpsSchedule = convertSchedulesToGPSFormat(externalSchedules);
+    const gpsSchedule = convertSchedulesToGPSFormat(externalSchedules || []);
     const hasSchedules = gpsSchedule.length > 0;
 
-    if (hasSchedules) {
-      // Marcar que hemos recibido horarios externos (para evitar que la API los sobrescriba)
-      hasExternalSchedulesRef.current = true;
-
-      setTracking(prev => ({
-        ...prev,
-        mode: is24h ? 'always' : 'schedule',
-        schedule: gpsSchedule
-      }));
-    }
+    // Siempre sincronizar: los horarios del Dashboard son la fuente de verdad
+    setTracking(prev => ({
+      ...prev,
+      mode: (is24h || !hasSchedules) ? 'always' : 'schedule',
+      schedule: gpsSchedule
+    }));
   }, [externalSchedules, is24h, convertSchedulesToGPSFormat]);
   
   // Actualizar refs cuando cambia el estado
@@ -215,14 +216,56 @@ export default function GPSTracking({
     currentPositionRef.current = currentPosition;
   }, [currentPosition]);
 
+  useEffect(() => {
+    schedulesRef.current = tracking.schedule;
+  }, [tracking.schedule]);
+
+  useEffect(() => {
+    is24hRef.current = is24h;
+  }, [is24h]);
+
   // Función para iniciar tracking
   const startGPSTracking = useCallback(async (shouldBroadcast: boolean = true, isAutoActivated: boolean = false) => {
     if (!navigator.geolocation) {
-      setGpsError("Tu navegador no soporta geolocalización");
+      setGpsError(t('geo.notSupported'));
       return;
     }
 
+    // VERIFICACIÓN PREVIA DEL PERMISO
+    // Si el permiso ya fue denegado, no intentar watchPosition (falla silenciosamente)
+    if (navigator.permissions && navigator.permissions.query) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        if (result.state === 'denied') {
+          console.warn('GPS: Permiso de ubicación denegado previamente');
+          setGpsPermissionDenied(true);
+          setGpsPermissionState('denied');
+          setShowPermissionHelp(true);
+          setGpsActive(false);
+          return;
+        }
+        // Escuchar cambios de permiso en tiempo real
+        result.onchange = () => {
+          setGpsPermissionState(result.state as 'granted' | 'denied' | 'prompt');
+          if (result.state === 'granted') {
+            setGpsPermissionDenied(false);
+            setShowPermissionHelp(false);
+            setGpsError(null);
+          } else if (result.state === 'denied') {
+            setGpsPermissionDenied(true);
+            setShowPermissionHelp(true);
+          }
+        };
+      } catch (err) {
+        // permissions.query no soportado (ej. iOS Safari), continuar normalmente
+        console.log('GPS: permissions.query no disponible, continuando...');
+      }
+    }
+
     setGpsError(null);
+    setGpsPermissionDenied(false);
+    setGpsPermissionState('granted');
+    setShowPermissionHelp(false);
     setGpsActive(true);
     setGpsAutoActivated(isAutoActivated); // Marcar si fue auto-activado
 
@@ -252,6 +295,9 @@ export default function GPSTracking({
           };
           setCurrentPosition(pos);
           setGpsError(null);
+          setGpsPermissionDenied(false);
+          setGpsPermissionState('granted');
+          setShowPermissionHelp(false);
           
           // Siempre broadcast la posición actualizada
           broadcastGPSState({
@@ -262,7 +308,20 @@ export default function GPSTracking({
           });
         },
         (error) => {
-          setGpsError(getGpsErrorMessage(error));
+          const msg = getGpsErrorMessage(error);
+          setGpsError(msg);
+          // Si el error es por permiso denegado, mostrar panel de ayuda
+          if (error.code === error.PERMISSION_DENIED) {
+            setGpsPermissionDenied(true);
+            setGpsPermissionState('denied');
+            setShowPermissionHelp(true);
+          }
+          // Si hay error, desactivar GPS
+          setGpsActive(false);
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+          }
         },
         {
           enableHighAccuracy: true,
@@ -422,6 +481,21 @@ export default function GPSTracking({
       const pos = currentPositionRef.current;
       if (!pos) return;
 
+      // VERIFICACIÓN DE HORARIOS: Solo enviar coordenadas si estamos dentro de workingHours
+      // (o si is24h está activado = disponible 24 horas)
+      const currentIs24h = is24hRef.current;
+      const currentSchedule = schedulesRef.current;
+      if (!currentIs24h && currentSchedule.length > 0) {
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        const todaySlots = currentSchedule.filter(s => s.day === dayOfWeek);
+        const isInSchedule = todaySlots.some(s => currentTime >= s.start && currentTime < s.end);
+
+        if (!isInSchedule) return; // Fuera de horario: no enviar coordenadas
+      }
+
       try {
         await fetch("/api/driver/location", {
           method: "POST",
@@ -475,6 +549,30 @@ export default function GPSTracking({
     const savedGpsConsent = localStorage.getItem('gps-tracking-consent');
     if (savedGpsConsent === 'true') {
       setHasGpsConsent(true);
+    }
+
+    // Check GPS browser permission state on mount
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(result => {
+        setGpsPermissionState(result.state as 'granted' | 'denied' | 'prompt');
+        if (result.state === 'denied') {
+          setGpsPermissionDenied(true);
+        }
+        result.onchange = () => {
+          setGpsPermissionState(result.state as 'granted' | 'denied' | 'prompt');
+          if (result.state === 'granted') {
+            setGpsPermissionDenied(false);
+            setShowPermissionHelp(false);
+            setGpsError(null);
+          } else if (result.state === 'denied') {
+            setGpsPermissionDenied(true);
+          }
+        };
+      }).catch(() => {
+        setGpsPermissionState('unsupported');
+      });
+    } else {
+      setGpsPermissionState('unsupported');
     }
 
     // Load schedule notification settings
@@ -728,6 +826,10 @@ export default function GPSTracking({
 
   // Auto-activate GPS when schedule starts
   useEffect(() => {
+    // No ejecutar si está en modo 24/7 (sin horarios fijos) o modo 'always'
+    // En estos casos, el GPS se controla manualmente sin restricciones de horario
+    if (is24h || tracking.mode === 'always') return;
+
     // Solo ejecutar si: auto-GPS activado, hay horarios, y hay consentimiento
     if (!autoGpsEnabled || !tracking.schedule.length || !hasGpsConsent) return;
 
@@ -856,28 +958,21 @@ export default function GPSTracking({
     scheduleTodayNotifications();
   };
 
-  // Cargar configuración
+  // Cargar estado del tracking (enabled/lastLocationAt) desde la BD
+  // NOTA: El schedule y mode NO se cargan desde aquí, vienen de los horarios del Dashboard (workingHours)
   useEffect(() => {
     const fetchTracking = async () => {
       try {
         const res = await fetch(`/api/driver/tracking?driverId=${driverId}`);
         const data = await res.json();
         if (data.success) {
-          // Si ya tenemos horarios externos sincronizados, NO sobrescribir schedule/mode
-          if (hasExternalSchedulesRef.current) {
-            setTracking(prev => ({
-              ...prev,
-              enabled: data.tracking.enabled,
-              lastLocationAt: data.tracking.lastLocationAt,
-            }));
-          } else {
-            // Si is24h está activo, forzar mode a 'always' independientemente de la BD
-            const correctMode = is24h ? 'always' : data.tracking.mode;
-            setTracking({
-              ...data.tracking,
-              mode: correctMode,
-            });
-          }
+          // Solo cargar enabled y lastLocationAt
+          // El schedule se deriva de los horarios del Dashboard via externalSchedules prop
+          setTracking(prev => ({
+            ...prev,
+            enabled: data.tracking.enabled,
+            lastLocationAt: data.tracking.lastLocationAt,
+          }));
         }
       } catch (error) {
         console.error("Error loading tracking config:", error);
@@ -887,7 +982,7 @@ export default function GPSTracking({
     };
 
     fetchTracking();
-  }, [driverId, is24h]);
+  }, [driverId]);
 
   // Guardar configuración de horarios
   const saveConfig = async (newConfig: Partial<TrackingConfig>) => {
@@ -981,8 +1076,8 @@ export default function GPSTracking({
                 <Navigation className="h-7 w-7 text-yellow-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-xl">Activar seguimiento GPS</h3>
-                <p className="text-sm text-muted-foreground">Permiso de ubicación</p>
+                <h3 className="font-semibold text-xl">{t('gps.consent.title')}</h3>
+                <p className="text-sm text-muted-foreground">{t('gps.consent.permissionLabel')}</p>
               </div>
             </div>
             
@@ -1034,7 +1129,7 @@ export default function GPSTracking({
                 onClick={acceptGpsConsent}
               >
                 <Navigation className="mr-2 h-4 w-4" />
-                Activar GPS
+                {t('gps.activate')}
               </Button>
             </div>
             
@@ -1076,7 +1171,7 @@ export default function GPSTracking({
               <div className="text-sm text-muted-foreground">
                 {lastSent
                   ? `Última actualización: ${lastSent.toLocaleTimeString()}`
-                  : gpsActive ? "Obteniendo ubicación..." : "Sin transmitir"}
+                  : gpsActive ? t('profile.gettingLocation') : t('gps.notTransmitting')}
               </div>
             </div>
           </div>
@@ -1089,15 +1184,206 @@ export default function GPSTracking({
           </div>
         </div>
 
-        {/* Error de GPS */}
-        {gpsError && (
+        {/* Error de GPS - Mensaje simple (si no es permiso denegado) */}
+        {gpsError && !gpsPermissionDenied && (
           <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-red-400" />
             <span className="text-sm text-red-400">{gpsError}</span>
           </div>
         )}
 
-        {/* BOTÓN PRINCIPAL GPS - Siempre visible */}
+        {/* PANEL DE AYUDA - Permiso denegado */}
+        {gpsPermissionDenied && showPermissionHelp && (
+          <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/30 space-y-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0" />
+              <span className="font-semibold text-sm text-orange-400">
+                Permiso de ubicación denegado
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              El navegador recordó que denegaste el acceso a tu ubicación. Para activar el GPS, sigue estos pasos según tu navegador:
+            </p>
+
+            <div className="space-y-3">
+              {/* Chrome Android */}
+              <details className="bg-muted/30 rounded-lg p-3">
+                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                  <Globe className="h-4 w-4 text-green-400" />
+                  Chrome Android
+                </summary>
+                <ol className="mt-2 ml-6 text-xs text-muted-foreground space-y-1 list-decimal">
+                  <li>Toca el icono de <b>candado</b> a la izquierda de la barra de dirección</li>
+                  <li>Busca <b>"Ubicación"</b></li>
+                  <li>Cambia a <b>"Permitir"</b></li>
+                  <li>Recarga esta página</li>
+                </ol>
+              </details>
+
+              {/* Safari iPhone */}
+              <details className="bg-muted/30 rounded-lg p-3">
+                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                  <Smartphone className="h-4 w-4 text-blue-400" />
+                  Safari iPhone
+                </summary>
+                <ol className="mt-2 ml-6 text-xs text-muted-foreground space-y-1 list-decimal">
+                  <li>Abre <b>Ajustes</b> del iPhone</li>
+                  <li>Ve a <b>Safari &gt; Configurar sitio web</b></li>
+                  <li>Busca esta página y toca <b>Ubicación</b></li>
+                  <li>Cambia a <b>"Permitir"</b></li>
+                  <li>Vuelve a esta página</li>
+                </ol>
+              </details>
+
+              {/* Chrome PC */}
+              <details className="bg-muted/30 rounded-lg p-3">
+                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                  <Monitor className="h-4 w-4 text-yellow-400" />
+                  Chrome PC
+                </summary>
+                <ol className="mt-2 ml-6 text-xs text-muted-foreground space-y-1 list-decimal">
+                  <li>Haz clic en el icono de <b>candado</b> a la izquierda de la barra de dirección</li>
+                  <li>Ve a <b>"Site settings"</b> (o Configuración del sitio)</li>
+                  <li>Busca <b>"Location"</b> (Ubicación)</li>
+                  <li>Cambia a <b>"Allow"</b> (Permitir)</li>
+                  <li>Recarga esta página</li>
+                </ol>
+              </details>
+
+              {/* Firefox PC */}
+              <details className="bg-muted/30 rounded-lg p-3">
+                <summary className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                  <Globe className="h-4 w-4 text-orange-400" />
+                  Firefox PC
+                </summary>
+                <ol className="mt-2 ml-6 text-xs text-muted-foreground space-y-1 list-decimal">
+                  <li>Haz clic en el icono de <b>candado</b> a la izquierda de la barra de dirección</li>
+                  <li>Junto a <b>"Ubicación"</b>, haz clic en <b>"Borrar permisos y recargar"</b></li>
+                  <li>O usa <b>Ajustes &gt; Privacidad y seguridad</b> para buscar esta página</li>
+                </ol>
+              </details>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full border-orange-400/50 text-orange-400 hover:bg-orange-400/10"
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Recargar página
+            </Button>
+          </div>
+        )}
+
+        {/* ESTADO DEL PERMISO GPS - Indicador antes del botón principal */}
+        <div className="p-4 rounded-xl bg-muted/30 border border-border space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-yellow-400" />
+              <Label className="text-sm font-medium">Permiso de ubicación</Label>
+            </div>
+            {gpsPermissionState === 'granted' && (
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                <Check className="h-3 w-3 mr-1" />
+                Concedido
+              </Badge>
+            )}
+            {gpsPermissionState === 'denied' && (
+              <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Denegado
+              </Badge>
+            )}
+            {gpsPermissionState === 'prompt' && (
+              <Badge variant="outline" className="text-yellow-400 border-yellow-400/50">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Sin pedir
+              </Badge>
+            )}
+            {gpsPermissionState === 'unsupported' && (
+              <Badge variant="outline" className="text-muted-foreground">
+                No verificable
+              </Badge>
+            )}
+            {gpsPermissionState === null && (
+              <Badge variant="outline" className="text-muted-foreground">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Verificando...
+              </Badge>
+            )}
+          </div>
+
+          {/* Description according to state */}
+          {gpsPermissionState === 'granted' && (
+            <p className="text-xs text-green-400/80">
+              Tu navegador permite compartir tu ubicacion. Puedes activar el GPS cuando quieras.
+            </p>
+          )}
+          {gpsPermissionState === 'denied' && (
+            <div className="space-y-3">
+              <p className="text-xs text-red-400/80">
+                Bloqueaste el acceso a tu ubicacion para este sitio. Necesitas desbloquearlo en la configuracion de tu navegador para usar el GPS.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full border-orange-400/50 text-orange-400 hover:bg-orange-400/10"
+                onClick={() => setShowPermissionHelp(!showPermissionHelp)}
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                {showPermissionHelp ? 'Ocultar instrucciones' : 'Como desbloquear el permiso'}
+              </Button>
+            </div>
+          )}
+          {gpsPermissionState === 'prompt' && (
+            <p className="text-xs text-yellow-400/80">
+              Aun no has respondido al permiso de ubicacion. Al pulsar Iniciar GPS se te pedira.
+            </p>
+          )}
+          {gpsPermissionState === 'unsupported' && (
+            <p className="text-xs text-muted-foreground">
+              Tu navegador (ej. Safari en iPhone) no permite verificar el permiso de antemano. Al pulsar Iniciar GPS se te pedira si es necesario.
+            </p>
+          )}
+
+          {/* Boton para solicitar permiso (si no esta concedido) */}
+          {(gpsPermissionState === 'prompt' || gpsPermissionState === 'unsupported') && !gpsActive && (
+            <Button
+              variant="outline"
+              className="w-full border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
+              onClick={async () => {
+                try {
+                  const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                      enableHighAccuracy: true,
+                      timeout: 10000,
+                      maximumAge: 5000,
+                    });
+                  });
+                  setGpsPermissionState('granted');
+                  setGpsPermissionDenied(false);
+                  setShowPermissionHelp(false);
+                  setCurrentPosition({
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                  });
+                } catch (error) {
+                  if (error instanceof GeolocationPositionError) {
+                    if (error.code === error.PERMISSION_DENIED) {
+                      setGpsPermissionState('denied');
+                      setGpsPermissionDenied(true);
+                      setShowPermissionHelp(true);
+                    }
+                  }
+                }
+              }}
+            >
+              <MapPin className="mr-2 h-4 w-4" />
+              Solicitar permiso de ubicacion
+            </Button>
+          )}
+        </div>
+
+        {/* BOTON PRINCIPAL GPS - Siempre visible */}
         <div className="space-y-3">
           <Label className="flex items-center gap-2">
             <Radio className="h-4 w-4" />

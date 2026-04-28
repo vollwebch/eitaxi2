@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useTranslations } from "next-intl";
 
 // Icono del taxi
 const taxiIcon = L.divIcon({
@@ -71,6 +72,7 @@ export default function TrackingMap({
   driverName,
   clientLocation,
 }: TrackingMapProps) {
+  const t = useTranslations();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -101,7 +103,7 @@ export default function TrackingMap({
     } else {
       markerRef.current = L.marker([latitude, longitude], { icon: taxiIcon })
         .addTo(map)
-        .bindPopup(`<strong>🚕 ${driverName || "Taxi"}</strong>`);
+        .bindPopup(`<strong>🚕 ${driverName || t('vehicleTypes.taxi')}</strong>`);
     }
 
     // Rotar el icono según heading
@@ -119,7 +121,7 @@ export default function TrackingMap({
       } else {
         clientMarkerRef.current = L.marker([clientLocation.latitude, clientLocation.longitude], { icon: clientIcon })
           .addTo(map)
-          .bindPopup('<strong>📍 Tu ubicación</strong>');
+          .bindPopup(`<strong>📍 ${t('geo.myLocation')}</strong>`);
       }
 
       // Dibujar línea entre cliente y taxi

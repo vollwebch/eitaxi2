@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
-import { requireAuth } from '@/lib/auth'
+import { requireAuth, createSessionToken, sessionCookieOptions } from '@/lib/auth'
 import { determineCoverageType, getCityCoordinates, CITY_COORDINATES } from '@/lib/geo-osm'
+
+// 🔒 Seguridad: Eliminar password de cualquier objeto driver antes de enviar al cliente
+function stripPassword<T extends Record<string, any>>(obj: T): Omit<T, 'password'> {
+  const { password: _pw, resetToken: _rt, resetTokenExpires: _rte, ...safe } = obj
+  return safe
+}
+
+// 🔒 Seguridad: JSON.parse seguro con fallback
+function safeJsonParse(value: unknown, fallback: any = []): any {
+  if (!value || typeof value !== 'string') return fallback
+  try { return JSON.parse(value) } catch { return fallback }
+}
 
 // Función para generar slug único
 async function generateUniqueSlug(name: string): Promise<string> {
@@ -102,6 +114,72 @@ function validateRequiredFields(body: any): { valid: boolean; missing: string[];
     fieldErrors['pickupZones'] = 'Debes añadir al menos una zona de recogida'
   }
   
+  return {
+    valid: missing.length === 0,
+    missing,
+    errors,
+    fieldErrors
+  }
+}
+
+function validateRequiredFieldsForUpdate(body: any, existingDriver: any): { valid: boolean; missing: string[]; errors: string[]; fieldErrors: Record<string, string> } {
+  const missing: string[] = []
+  const errors: string[] = []
+  const fieldErrors: Record<string, string> = {}
+
+  // Nombre (obligatorio)
+  if (!body.name || body.name.trim().length < 2) {
+    missing.push('nombre')
+    errors.push('El nombre es obligatorio (mínimo 2 caracteres)')
+    fieldErrors['name'] = 'El nombre es obligatorio (mínimo 2 caracteres)'
+  }
+
+  // Teléfono (obligatorio)
+  if (!body.phone || body.phone.trim().length < 6) {
+    missing.push('teléfono')
+    errors.push('El teléfono es obligatorio')
+    fieldErrors['phone'] = 'El teléfono es obligatorio'
+  }
+
+  // Email (obligatorio y válido)
+  if (!body.email || !body.email.includes('@')) {
+    missing.push('email')
+    errors.push('El email es obligatorio y debe ser válido')
+    fieldErrors['email'] = 'El email es obligatorio y debe ser válido'
+  }
+
+  // Servicios (al menos uno)
+  if (!body.services || (Array.isArray(body.services) && body.services.length === 0)) {
+    missing.push('servicios')
+    errors.push('Debes seleccionar al menos un servicio')
+    fieldErrors['services'] = 'Debes seleccionar al menos un servicio'
+  }
+
+  // Tipo de vehículo (al menos uno)
+  const hasVehicleTypes = body.vehicleTypes && Array.isArray(body.vehicleTypes) && body.vehicleTypes.length > 0;
+  const hasVehicleType = body.vehicleType && body.vehicleType.trim().length > 0;
+  if (!hasVehicleTypes && !hasVehicleType && !existingDriver.vehicleType) {
+    missing.push('tipo de vehículo')
+    errors.push('Debes seleccionar al menos un tipo de vehículo')
+    fieldErrors['vehicleTypes'] = 'Debes seleccionar al menos un tipo de vehículo'
+  }
+
+  // Zonas de servicio (al menos una zona de recogida)
+  if (body.serviceZonesWithExclusions && Array.isArray(body.serviceZonesWithExclusions)) {
+    if (body.serviceZonesWithExclusions.length === 0) {
+      missing.push('zonas de servicio')
+      errors.push('Debes añadir al menos una zona de servicio')
+      fieldErrors['serviceZones'] = 'Debes añadir al menos una zona de servicio'
+    } else {
+      const hasPickupZones = body.serviceZonesWithExclusions.some((z: { zoneMode?: string }) => z.zoneMode === 'pickup')
+      if (!hasPickupZones) {
+        missing.push('zonas de recogida')
+        errors.push('Debes tener al menos una zona de RECOGIDA (pickup)')
+        fieldErrors['pickupZones'] = 'Debes tener al menos una zona de recogida'
+      }
+    }
+  }
+
   return {
     valid: missing.length === 0,
     missing,
@@ -505,18 +583,26 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({
+    // 🔑 Crear sesión JWT automática tras registro para acceso directo al dashboard
+    const sessionToken = await createSessionToken({
+      id: driver.id,
+      email: driver.email,
+      name: driver.name,
+    })
+
+    const responseData = {
       success: true,
       data: {
         id: driver.id,
         name: driver.name,
         slug: driver.slug,
+        email: driver.email,
         city: driver.city,
         canton: driver.canton,
-        services: JSON.parse(driver.services as string),
-        languages: JSON.parse(driver.languages as string),
-        serviceZones: JSON.parse(driver.serviceZones as string),
-        routes: JSON.parse(driver.routes as string),
+        services: safeJsonParse(driver.services),
+        languages: safeJsonParse(driver.languages),
+        serviceZones: safeJsonParse(driver.serviceZones),
+        routes: safeJsonParse(driver.routes),
         vehicleType: driver.vehicleType,
         vehicleTypes: vehicleTypes || [primaryVehicleType],
         basePrice: driver.basePrice,
@@ -527,7 +613,6 @@ export async function POST(request: NextRequest) {
         facebook: driver.facebook,
         driverRoutes: driverWithRoutes?.driverRoutes || [],
         schedules: driverWithRoutes?.schedules || [],
-        // Nuevos campos
         operationRadius: driver.operationRadius,
         coverageType: driver.coverageType,
         latitude: driver.latitude,
@@ -540,7 +625,17 @@ export async function POST(request: NextRequest) {
         autoAssigned: !coverageType && !operationRadius,
         reason: autoCoverage.reason,
       }
+    }
+
+    const response = NextResponse.json(responseData)
+
+    // 🍪 Establecer cookie de sesión para acceso directo al dashboard
+    response.cookies.set(sessionCookieOptions.name, sessionToken, {
+      ...sessionCookieOptions,
+      maxAge: sessionCookieOptions.maxAge,
     })
+
+    return response
   } catch (error: any) {
     // 🔒 Error sanitizado en producción
     if (process.env.NODE_ENV === 'development') {
@@ -601,8 +696,18 @@ export async function GET(request: NextRequest) {
     const citySlug = searchParams.get('city')
     const id = searchParams.get('id')
 
-    // Get single driver by ID (for dashboard)
+    // Get single driver by ID (for dashboard) - requiere autenticación
     if (id && !slug) {
+      // 🔒 Verificar autenticación para acceso a datos del dashboard
+      try {
+        await requireAuth(request)
+      } catch {
+        return NextResponse.json(
+          { success: false, error: 'No autenticado' },
+          { status: 401 }
+        )
+      }
+
       const driver = await db.taxiDriver.findUnique({
         where: { id },
         include: {
@@ -625,7 +730,7 @@ export async function GET(request: NextRequest) {
       // Schedules: usar los de la tabla, o workingHours, o generar defaults
       let schedulesData = driver.schedules && driver.schedules.length > 0 
         ? driver.schedules 
-        : (driver.workingHours ? JSON.parse(driver.workingHours as string) : null);
+        : (driver.workingHours ? safeJsonParse(driver.workingHours, null) : null);
       
       // Flag para indicar si hay horarios guardados de verdad (no defaults)
       const hasRealSchedules = !!(driver.schedules && driver.schedules.length > 0) || 
@@ -647,20 +752,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          ...driver,
-          services: JSON.parse(driver.services as string),
-          routes: JSON.parse(driver.routes as string),
-          languages: JSON.parse(driver.languages as string),
-          serviceZones: JSON.parse(driver.serviceZones as string),
-          workingHours: driver.workingHours ? JSON.parse(driver.workingHours as string) : null,
+          ...stripPassword(driver),
+          services: safeJsonParse(driver.services),
+          routes: safeJsonParse(driver.routes),
+          languages: safeJsonParse(driver.languages),
+          serviceZones: safeJsonParse(driver.serviceZones),
+          workingHours: safeJsonParse(driver.workingHours, null),
           schedules: schedulesData,
-          hasRealSchedules, // Nuevo flag para indicar si hay horarios guardados
-          vehicleTypes: driver.vehicleTypes ? JSON.parse(driver.vehicleTypes as string) : [driver.vehicleType],
+          hasRealSchedules,
+          vehicleTypes: safeJsonParse(driver.vehicleTypes, [driver.vehicleType]),
           vehicles: driver.vehicles || [],
-          // Zonas con modo (pickup/service)
           driverServiceZones: driver.driverServiceZones?.map(z => ({
             ...z,
-            exclusions: JSON.parse(z.exclusions as string || '[]')
+            exclusions: safeJsonParse(z.exclusions, [])
           })) || [],
         },
       })
@@ -707,7 +811,7 @@ export async function GET(request: NextRequest) {
       // Schedules: usar los de la tabla, o workingHours, o generar defaults
       let schedulesData = driver.schedules && driver.schedules.length > 0 
         ? driver.schedules 
-        : (driver.workingHours ? JSON.parse(driver.workingHours as string) : null);
+        : (driver.workingHours ? safeJsonParse(driver.workingHours, null) : null);
       
       // Si aún no hay schedules, generar defaults
       if (!schedulesData || schedulesData.length === 0) {
@@ -725,14 +829,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          ...driver,
-          services: JSON.parse(driver.services as string),
-          routes: JSON.parse(driver.routes as string),
-          languages: JSON.parse(driver.languages as string),
-          serviceZones: JSON.parse(driver.serviceZones as string),
-          workingHours: driver.workingHours ? JSON.parse(driver.workingHours as string) : null,
+          ...stripPassword(driver),
+          services: safeJsonParse(driver.services),
+          routes: safeJsonParse(driver.routes),
+          languages: safeJsonParse(driver.languages),
+          serviceZones: safeJsonParse(driver.serviceZones),
+          workingHours: safeJsonParse(driver.workingHours, null),
           schedules: schedulesData,
-          vehicleTypes: driver.vehicleTypes ? JSON.parse(driver.vehicleTypes as string) : [driver.vehicleType],
+          vehicleTypes: safeJsonParse(driver.vehicleTypes, [driver.vehicleType]),
           vehicles: driver.vehicles || [],
         },
       })
@@ -779,12 +883,12 @@ export async function GET(request: NextRequest) {
 
     // Parsear JSON fields
     const parsedDrivers = drivers.map(d => ({
-      ...d,
-      services: JSON.parse(d.services as string),
-      routes: JSON.parse(d.routes as string),
-      languages: JSON.parse(d.languages as string),
-      serviceZones: JSON.parse(d.serviceZones as string),
-      vehicleTypes: d.vehicleTypes ? JSON.parse(d.vehicleTypes as string) : [d.vehicleType],
+      ...stripPassword(d),
+      services: safeJsonParse(d.services),
+      routes: safeJsonParse(d.routes),
+      languages: safeJsonParse(d.languages),
+      serviceZones: safeJsonParse(d.serviceZones),
+      vehicleTypes: safeJsonParse(d.vehicleTypes, [d.vehicleType]),
       vehicles: d.vehicles || [],
     }))
 
@@ -847,6 +951,21 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Conductor no encontrado' },
         { status: 404 }
+      )
+    }
+
+    // Validar campos obligatorios antes de actualizar
+    const validation = validateRequiredFieldsForUpdate(body, existingDriver)
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Faltan campos obligatorios: ' + validation.missing.join(', '),
+          missing: validation.missing,
+          errors: validation.errors,
+          fieldErrors: validation.fieldErrors
+        },
+        { status: 400 }
       )
     }
 
@@ -1015,18 +1134,18 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        ...updatedDriver,
-        services: JSON.parse(updatedDriver.services as string),
-        languages: JSON.parse(updatedDriver.languages as string),
-        serviceZones: JSON.parse(updatedDriver.serviceZones as string),
-        routes: JSON.parse(updatedDriver.routes as string),
-        vehicleTypes: updatedDriver.vehicleTypes ? JSON.parse(updatedDriver.vehicleTypes as string) : [updatedDriver.vehicleType],
+        ...stripPassword(updatedDriver),
+        services: safeJsonParse(updatedDriver.services),
+        languages: safeJsonParse(updatedDriver.languages),
+        serviceZones: safeJsonParse(updatedDriver.serviceZones),
+        routes: safeJsonParse(updatedDriver.routes),
+        vehicleTypes: safeJsonParse(updatedDriver.vehicleTypes, [updatedDriver.vehicleType]),
         vehicles: updatedDriver.vehicles || [],
-        workingHours: updatedDriver.workingHours ? JSON.parse(updatedDriver.workingHours as string) : null,
+        workingHours: safeJsonParse(updatedDriver.workingHours, null),
         schedules: updatedDriver.schedules || [],
         driverServiceZones: updatedDriver.driverServiceZones?.map(z => ({
           ...z,
-          exclusions: JSON.parse(z.exclusions as string || '[]')
+          exclusions: safeJsonParse(z.exclusions, [])
         })) || [],
       },
     })

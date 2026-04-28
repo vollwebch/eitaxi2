@@ -1,87 +1,63 @@
-import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import { db } from '@/lib/db'
-import { createClientSessionToken, clientSessionCookieOptions } from '@/lib/client-auth'
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { createClientSessionToken, clientSessionCookieOptions } from '@/lib/client-auth';
+import bcrypt from 'bcryptjs';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { name, email, phone, password } = body
+    const body = await request.json();
+    const { name, email, phone, password } = body;
 
-    // Validate required fields
-    if (!name || typeof name !== 'string' || name.trim().length < 2) {
-      return NextResponse.json(
-        { success: false, error: 'El nombre es requerido (mínimo 2 caracteres)' },
-        { status: 400 }
-      )
+    if (!name || !name.trim()) {
+      return NextResponse.json({ success: false, error: 'El nombre es requerido' }, { status: 400 });
+    }
+    if (!email || !email.trim()) {
+      return NextResponse.json({ success: false, error: 'El email es requerido' }, { status: 400 });
+    }
+    if (!password || password.length < 6) {
+      return NextResponse.json({ success: false, error: 'La contrasena debe tener al menos 6 caracteres' }, { status: 400 });
     }
 
-    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json(
-        { success: false, error: 'Email inválido' },
-        { status: 400 }
-      )
+    const existing = await db.client.findUnique({ where: { email: email.trim().toLowerCase() } });
+    if (existing) {
+      return NextResponse.json({ success: false, error: 'Ya existe una cuenta con este email' }, { status: 409 });
     }
 
-    if (!password || typeof password !== 'string' || password.length < 8) {
-      return NextResponse.json(
-        { success: false, error: 'La contraseña debe tener al menos 8 caracteres' },
-        { status: 400 }
-      )
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const normalizedEmail = email.toLowerCase().trim()
-
-    // Check if email already exists
-    const existingClient = await db.client.findUnique({
-      where: { email: normalizedEmail },
-    })
-
-    if (existingClient) {
-      return NextResponse.json(
-        { success: false, error: 'Este email ya está registrado' },
-        { status: 409 }
-      )
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12)
-
-    // Create client
     const client = await db.client.create({
       data: {
         name: name.trim(),
-        email: normalizedEmail,
+        email: email.trim().toLowerCase(),
         phone: phone?.trim() || null,
         password: hashedPassword,
       },
-    })
+    });
 
-    // Create JWT session token
-    const sessionToken = await createClientSessionToken({
+    const token = await createClientSessionToken({
       id: client.id,
       email: client.email,
       name: client.name,
-    })
+    });
 
     const response = NextResponse.json({
       success: true,
-      data: {
-        clientId: client.id,
-        email: client.email,
-        name: client.name,
-      },
-    })
+      data: { id: client.id, name: client.name, email: client.email },
+    });
 
-    // Set HTTP-only cookie with JWT
-    response.cookies.set(clientSessionCookieOptions.name, sessionToken, clientSessionCookieOptions)
+    response.cookies.set({
+      name: clientSessionCookieOptions.name,
+      value: token,
+      httpOnly: clientSessionCookieOptions.httpOnly,
+      secure: clientSessionCookieOptions.secure,
+      sameSite: clientSessionCookieOptions.sameSite,
+      maxAge: clientSessionCookieOptions.maxAge,
+      path: clientSessionCookieOptions.path,
+    });
 
-    return response
+    return response;
   } catch (error) {
-    console.error('Client register error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Error al crear la cuenta' },
-      { status: 500 }
-    )
+    console.error('Client register error:', error);
+    return NextResponse.json({ success: false, error: 'Error al registrar' }, { status: 500 });
   }
 }

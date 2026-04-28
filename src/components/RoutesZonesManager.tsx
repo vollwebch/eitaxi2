@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { POPULAR_PLACES } from "@/lib/geo-data";
+import { useTranslations } from 'next-intl';
 import ZoneSelector, { ServiceZone } from "@/components/ZoneSelector";
 import PlaceSearch, { PlaceResult } from "@/components/PlaceSearch";
 
@@ -52,6 +53,8 @@ export default function RoutesZonesManager({ driverId, baseCity, baseCanton, onZ
   const [routes, setRoutes] = useState<DriverRoute[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"zones" | "routes">("zones");
+  const tBooking = useTranslations('booking');
+  const tServices = useTranslations('services');
 
   // Form state for routes
   const [newOrigin, setNewOrigin] = useState("");
@@ -260,8 +263,8 @@ export default function RoutesZonesManager({ driverId, baseCity, baseCanton, onZ
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="city">Ciudad</SelectItem>
-                        <SelectItem value="airport">Aeropuerto</SelectItem>
+                        <SelectItem value="city">{tServices('city')}</SelectItem>
+                        <SelectItem value="airport">{tServices('airport')}</SelectItem>
                         <SelectItem value="train_station">Estación</SelectItem>
                         <SelectItem value="place">Lugar</SelectItem>
                       </SelectContent>
@@ -277,15 +280,15 @@ export default function RoutesZonesManager({ driverId, baseCity, baseCanton, onZ
 
                 {/* Destination */}
                 <div>
-                  <Label className="text-xs text-muted-foreground">Destino</Label>
+                  <Label className="text-xs text-muted-foreground">{tBooking('destination')}</Label>
                   <div className="flex gap-2 mt-1">
                     <Select value={newDestType} onValueChange={setNewDestType}>
                       <SelectTrigger className="w-28">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="city">Ciudad</SelectItem>
-                        <SelectItem value="airport">Aeropuerto</SelectItem>
+                        <SelectItem value="city">{tServices('city')}</SelectItem>
+                        <SelectItem value="airport">{tServices('airport')}</SelectItem>
                         <SelectItem value="train_station">Estación</SelectItem>
                         <SelectItem value="place">Lugar</SelectItem>
                       </SelectContent>

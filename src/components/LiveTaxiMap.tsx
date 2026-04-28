@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,6 +85,7 @@ export default function LiveTaxiMap({
   radius = 25,
   onTaxiSelect 
 }: LiveTaxiMapProps) {
+  const t = useTranslations();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -114,11 +116,11 @@ export default function LiveTaxiMap({
         setLastUpdate(new Date());
         setError(null);
       } else {
-        setError(data.error || 'Error al cargar taxis');
+        setError(data.error || t('common.connectionError'));
       }
     } catch (err) {
       console.error('Error fetching live taxis:', err);
-      setError('Error de conexión');
+      setError(t('common.connectionError'));
     } finally {
       setLoading(false);
     }
@@ -244,7 +246,7 @@ export default function LiveTaxiMap({
           )}
         </div>
         <Button variant="outline" size="sm" onClick={fetchTaxis} disabled={loading}>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Actualizar'}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : t('dashboard.chat.refresh')}
         </Button>
       </div>
 

@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
     const fromLon = searchParams.get('fromLon')
     const toLat = searchParams.get('toLat')
     const toLon = searchParams.get('toLon')
+    const waypointsParam = searchParams.get('waypoints') // format: "lat1,lon1;lat2,lon2;..."
 
     if (!fromLat || !fromLon || !toLat || !toLon) {
       return NextResponse.json({ success: false, error: 'Faltan coordenadas' }, { status: 400 })
@@ -80,17 +81,34 @@ export async function GET(request: NextRequest) {
     const toLatNum = parseFloat(toLat)
     const toLonNum = parseFloat(toLon)
 
-    // Verificar cache primero
-    const cacheKey = `${fromLatNum.toFixed(4)},${fromLonNum.toFixed(4)}→${toLatNum.toFixed(4)},${toLonNum.toFixed(4)}`
+    // Parse waypoints (intermediate stops)
+    const waypoints: Array<{ lat: number; lon: number }> = []
+    if (waypointsParam) {
+      for (const wp of waypointsParam.split(';')) {
+        const [lat, lon] = wp.split(',').map(Number)
+        if (!isNaN(lat) && !isNaN(lon)) {
+          waypoints.push({ lat, lon })
+        }
+      }
+    }
+
+    // Verificar cache primero (include waypoints in cache key)
+    const wpKey = waypoints.map(w => `${w.lat.toFixed(4)},${w.lon.toFixed(4)}`).join('|')
+    const cacheKey = `${fromLatNum.toFixed(4)},${fromLonNum.toFixed(4)}→${wpKey}→${toLatNum.toFixed(4)},${toLonNum.toFixed(4)}`
     const cached = routeCache.get(cacheKey)
     if (cached && cached.data.geometry) {
       return NextResponse.json({ success: true, data: { ...cached.data, fromCache: true }, fromCache: true })
     }
 
+    // Build OSRM coordinates string: fromLon,fromLat;wp1Lon,wp1Lat;...;toLon,toLat
+    const coordsStr = waypoints.length > 0
+      ? `${fromLonNum},${fromLatNum};${waypoints.map(w => `${w.lon},${w.lat}`).join(';')};${toLonNum},${toLatNum}`
+      : `${fromLonNum},${fromLatNum};${toLonNum},${toLatNum}`
+
     // URLs de servidores
     const servers = [
-      `https://router.project-osrm.org/route/v1/driving/${fromLonNum},${fromLatNum};${toLonNum},${toLatNum}?overview=full&geometries=polyline`,
-      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${fromLonNum},${fromLatNum};${toLonNum},${toLatNum}?overview=full&geometries=polyline`
+      `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=full&geometries=polyline`,
+      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${coordsStr}?overview=full&geometries=polyline`
     ];
 
     // Intentar servidores uno por uno

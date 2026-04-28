@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 import {
   Car,
   MapPin,
@@ -60,6 +61,7 @@ interface ClientLocation {
 }
 
 export default function TrackDriverPage() {
+  const t = useTranslations();
   const params = useParams();
   const driverId = params.driverId as string;
 
@@ -89,7 +91,7 @@ export default function TrackDriverPage() {
           setError(data.error || "Error al obtener ubicación");
         }
       } catch (err) {
-        setError("Error de conexión");
+        setError(t('common.connectionError'));
       } finally {
         setLoading(false);
       }
@@ -204,12 +206,12 @@ export default function TrackDriverPage() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full p-8 text-center border-border">
           <AlertCircle className="h-16 w-16 mx-auto text-red-400 mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Error</h1>
+          <h1 className="text-2xl font-bold mb-2">{t('common.error')}</h1>
           <p className="text-muted-foreground mb-6">{error}</p>
           <Link href="/">
             <Button className="bg-yellow-400 text-black hover:bg-yellow-500">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver al inicio
+              {t('login.backToHome')}
             </Button>
           </Link>
         </Card>
@@ -237,12 +239,12 @@ export default function TrackDriverPage() {
               {trackingActive ? (
                 <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
                   <Wifi className="h-3 w-3 mr-1" />
-                  En vivo
+                  {t('drivers.live')}
                 </Badge>
               ) : (
                 <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30">
                   <WifiOff className="h-3 w-3 mr-1" />
-                  Desconectado
+                  {t('drivers.offline')}
                 </Badge>
               )}
             </div>
@@ -309,7 +311,7 @@ export default function TrackDriverPage() {
                 <Car className="h-6 w-6 text-yellow-400" />
               </div>
               <div>
-                <div className="font-medium">{driver?.name || "Conductor"}</div>
+                <div className="font-medium">{driver?.name || t('tracking.driver')}</div>
                 <div className="text-sm text-muted-foreground">
                   {getVehicleDescription()}
                 </div>

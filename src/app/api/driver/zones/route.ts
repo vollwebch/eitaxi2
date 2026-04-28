@@ -6,9 +6,18 @@ import { requireAuth } from '@/lib/auth'
 // API para gestionar zonas de servicio del conductor
 // ============================================
 
-// GET - Obtener zonas del conductor
+// GET - Obtener zonas del conductor (requiere auth)
 export async function GET(request: NextRequest) {
   try {
+    try {
+      await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const driverId = searchParams.get('driverId')
 
@@ -126,8 +135,9 @@ export async function POST(request: NextRequest) {
 // DELETE - Eliminar zona
 export async function DELETE(request: NextRequest) {
   try {
+    let session
     try {
-      await requireAuth(request)
+      session = await requireAuth(request)
     } catch {
       return NextResponse.json(
         { success: false, error: 'No autenticado' },
@@ -143,6 +153,23 @@ export async function DELETE(request: NextRequest) {
         success: false,
         error: 'zoneId requerido'
       }, { status: 400 })
+    }
+
+    // Verify ownership: the zone must belong to the authenticated driver
+    const zone = await db.driverServiceZone.findUnique({
+      where: { id: zoneId }
+    })
+    if (!zone) {
+      return NextResponse.json({
+        success: false,
+        error: 'Zona no encontrada'
+      }, { status: 404 })
+    }
+    if (zone.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
     }
 
     await db.driverServiceZone.delete({

@@ -1,67 +1,51 @@
-import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
-import { db } from '@/lib/db'
-import { createClientSessionToken, clientSessionCookieOptions } from '@/lib/client-auth'
+import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
+import { db } from '@/lib/db';
+import { createClientSessionToken, clientSessionCookieOptions } from '@/lib/client-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { email, password } = body
+    const body = await request.json();
+    const { email, password } = body;
 
     if (!email || !password) {
-      return NextResponse.json(
-        { success: false, error: 'Email y contraseña son requeridos' },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Email y contrasena son requeridos' }, { status: 400 });
     }
 
-    // Find client by email
-    const client = await db.client.findUnique({
-      where: { email: email.toLowerCase() },
-    })
-
+    const client = await db.client.findUnique({ where: { email: email.trim().toLowerCase() } });
     if (!client) {
-      return NextResponse.json(
-        { success: false, error: 'Credenciales inválidas' },
-        { status: 401 }
-      )
+      return NextResponse.json({ success: false, error: 'Credenciales incorrectas' }, { status: 401 });
     }
 
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, client.password)
-
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { success: false, error: 'Credenciales inválidas' },
-        { status: 401 }
-      )
+    const valid = await bcrypt.compare(password, client.password);
+    if (!valid) {
+      return NextResponse.json({ success: false, error: 'Credenciales incorrectas' }, { status: 401 });
     }
 
-    // Create JWT session token
-    const sessionToken = await createClientSessionToken({
+    const token = await createClientSessionToken({
       id: client.id,
       email: client.email,
       name: client.name,
-    })
+    });
 
     const response = NextResponse.json({
       success: true,
-      data: {
-        clientId: client.id,
-        email: client.email,
-        name: client.name,
-      },
-    })
+      data: { id: client.id, name: client.name, email: client.email, phone: client.phone },
+    });
 
-    // Set HTTP-only cookie with JWT
-    response.cookies.set(clientSessionCookieOptions.name, sessionToken, clientSessionCookieOptions)
+    response.cookies.set({
+      name: clientSessionCookieOptions.name,
+      value: token,
+      httpOnly: clientSessionCookieOptions.httpOnly,
+      secure: clientSessionCookieOptions.secure,
+      sameSite: clientSessionCookieOptions.sameSite,
+      maxAge: clientSessionCookieOptions.maxAge,
+      path: clientSessionCookieOptions.path,
+    });
 
-    return response
+    return response;
   } catch (error) {
-    console.error('Client login error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Error al iniciar sesión' },
-      { status: 500 }
-    )
+    console.error('Client login error:', error);
+    return NextResponse.json({ success: false, error: 'Error al iniciar sesion' }, { status: 500 });
   }
 }

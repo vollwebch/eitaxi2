@@ -6,9 +6,18 @@ import { requireAuth } from '@/lib/auth'
 // API para gestionar rutas habituales del conductor
 // ============================================
 
-// GET - Obtener rutas del conductor
+// GET - Obtener rutas del conductor (requiere auth)
 export async function GET(request: NextRequest) {
   try {
+    try {
+      await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const driverId = searchParams.get('driverId')
 
@@ -124,8 +133,9 @@ export async function POST(request: NextRequest) {
 // PUT - Actualizar ruta
 export async function PUT(request: NextRequest) {
   try {
+    let session
     try {
-      await requireAuth(request)
+      session = await requireAuth(request)
     } catch {
       return NextResponse.json(
         { success: false, error: 'No autenticado' },
@@ -141,6 +151,23 @@ export async function PUT(request: NextRequest) {
         success: false,
         error: 'routeId requerido'
       }, { status: 400 })
+    }
+
+    // Verify ownership: the route must belong to the authenticated driver
+    const existingRoute = await db.driverRoute.findUnique({
+      where: { id: routeId }
+    })
+    if (!existingRoute) {
+      return NextResponse.json({
+        success: false,
+        error: 'Ruta no encontrada'
+      }, { status: 404 })
+    }
+    if (existingRoute.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
     }
 
     const route = await db.driverRoute.update({

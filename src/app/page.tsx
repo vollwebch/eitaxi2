@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import {
   Search,
   Phone,
@@ -38,9 +39,10 @@ import {
   Radio,
   Download,
   Smartphone,
+  CalendarPlus,
   User,
-  LogIn,
-  UserPlus,
+  Plus,
+  CircleDot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,14 +62,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle, SheetHeader } from "@/components/ui/sheet";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BookingModal from "@/components/BookingModal";
+import DirectChatDialog from "@/components/DirectChatDialog";
+import { useTranslations } from 'next-intl';
+import { checkDriverAvailability } from '@/lib/schedule-check';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 // Leaflet CSS - solo en cliente
 if (typeof window !== 'undefined') {
@@ -165,6 +164,7 @@ interface TaxiDriver {
   trackingEnabled?: boolean;
   trackingMode?: string;
   lastLocationAt?: string | null;
+  workingHours?: Array<{ dayOfWeek: number; mode: string; slots: Array<{ startTime: string; endTime: string }> }>;
   _distance?: number;
   _coverageReason?: string;
   _estimatedPrice?: { minPrice: number; maxPrice: number };
@@ -172,33 +172,42 @@ interface TaxiDriver {
   _marker?: string;  // "⭐ Cerca de ti", "📍 En tu zona", "🚕 Disponible cerca"
   _priority?: number;  // 3 = ambos bloques, 2 = bloque A, 1 = bloque B
   _block?: 'A' | 'B' | 'BOTH';  // Tipo de coincidencia
+  _directionType?: 'roundTrip' | 'oneWay';  // Ida y vuelta o solo ida
+  _isFavorite?: boolean;  // Si el conductor es favorito del cliente
+  _favoriteCount?: number;  // Número total de favoritos del conductor
 }
 
-// Service config
-const serviceConfig: Record<string, { icon: typeof Car; label: string }> = {
-  airport: { icon: Plane, label: "Aeropuerto" },
-  city: { icon: Building2, label: "Ciudad" },
-  long_distance: { icon: Route, label: "Larga distancia" },
-  limousine: { icon: Car, label: "Limusina" },
-  corporate: { icon: Shield, label: "Corporativo" },
-  events: { icon: Calendar, label: "Eventos" },
-};
+// Service config - dynamic with translations
+function getServiceConfig(t: (key: string) => string): Record<string, { icon: typeof Car; label: string }> {
+  return {
+    airport: { icon: Plane, label: t('airport') },
+    city: { icon: Building2, label: t('city') },
+    long_distance: { icon: Route, label: t('long_distance') },
+    limousine: { icon: Car, label: t('limousine') },
+    corporate: { icon: Shield, label: t('corporate') },
+    events: { icon: Calendar, label: t('events') },
+  };
+}
 
-// Vehicle type config
-const vehicleTypeConfig: Record<string, { label: string; icon: string }> = {
-  taxi: { label: "Taxi", icon: "🚕" },
-  limousine: { label: "Limusina", icon: "🚗" },
-  van: { label: "Van", icon: "🚐" },
-  premium: { label: "Premium", icon: "✨" },
-};
+// Vehicle type config - dynamic with translations
+function getVehicleTypeConfig(t: (key: string) => string): Record<string, { label: string; icon: string }> {
+  return {
+    taxi: { label: t('taxi'), icon: "🚕" },
+    limousine: { label: t('limousine'), icon: "🚗" },
+    van: { label: t('van'), icon: "🚐" },
+    premium: { label: t('premium'), icon: "✨" },
+  };
+}
 
-// Quick POIs config
-const QUICK_POIS = [
-  { id: 'gas', icon: Fuel, label: 'Gasolinera', type: 'gas' },
-  { id: 'pharmacy', icon: '💊', label: 'Farmacia', type: 'pharmacy' },
-  { id: 'hospital', icon: '🏥', label: 'Hospital', type: 'hospital' },
-  { id: 'train', icon: '🚂', label: 'Estación', type: 'train' },
-];
+// Quick POIs config - dynamic with translations
+function getQuickPOIs(t: (key: string, vars?: Record<string, string>) => string) {
+  return [
+    { id: 'gas', icon: Fuel, label: t('gas_station'), type: 'gas' },
+    { id: 'pharmacy', icon: '💊', label: t('pharmacy'), type: 'pharmacy' },
+    { id: 'hospital', icon: '🏥', label: t('hospital'), type: 'hospital' },
+    { id: 'train', icon: '🚂', label: t('train_station'), type: 'train' },
+  ];
+}
 
 // ============================================
 // LOCALSTORAGE HELPERS
@@ -265,193 +274,8 @@ function Header({
   onCantonSelect: (canton: Canton) => void;
   onMobileMenuOpen: () => void;
 }) {
-  const [showLoginDialog, setShowLoginDialog] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [sessionType, setSessionType] = useState<'driver' | 'client' | null>(null);
-
-  useEffect(() => {
-    // Check if driver is logged in
-    const driverSession = localStorage.getItem('eitaxi_session');
-    if (driverSession) {
-      try {
-        const parsed = JSON.parse(driverSession);
-        if (parsed.driverId) {
-          setIsLoggedIn(true);
-          setSessionType('driver');
-          return;
-        }
-      } catch { /* ignore */ }
-    }
-    // Check if client is logged in
-    const clientSession = localStorage.getItem('eitaxi_client_session');
-    if (clientSession) {
-      try {
-        const parsed = JSON.parse(clientSession);
-        if (parsed.clientId) {
-          setIsLoggedIn(true);
-          setSessionType('client');
-          return;
-        }
-      } catch { /* ignore */ }
-    }
-    setIsLoggedIn(false);
-    setSessionType(null);
-  }, []);
-
-  // ===== NOT LOGGED IN: Show "Acceder" button =====
-  if (!isLoggedIn) {
-    return (
-      <>
-        <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl">
-          <div className="container mx-auto px-4">
-            <div className="flex h-16 items-center justify-between">
-              <Link href="/" className="flex items-center gap-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-500">
-                  <Car className="h-6 w-6 text-black" />
-                </div>
-                <span className="text-xl font-bold">
-                  <span className="text-yellow-400">ei</span>
-                  <span className="text-white">taxi</span>
-                </span>
-              </Link>
-
-              <nav className="hidden md:flex items-center gap-6">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="gap-1">
-                      Cantones <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
-                    {cantons.length > 0 ? cantons.map((canton) => (
-                      <DropdownMenuItem
-                        key={canton.id}
-                        onClick={() => onCantonSelect(canton)}
-                        className="flex items-center justify-between"
-                      >
-                        <span>{canton.name}</span>
-                        <Badge variant="secondary" className="text-xs">
-                          {canton._count?.drivers || 0}
-                        </Badge>
-                      </DropdownMenuItem>
-                    )) : (
-                      <DropdownMenuItem disabled>Cargando...</DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </nav>
-
-              <div className="flex items-center gap-1 sm:gap-2">
-                {/* Acceder - abre diálogo con tabs */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-sm"
-                  onClick={() => setShowLoginDialog(true)}
-                >
-                  <LogIn className="mr-1.5 h-4 w-4" />
-                  <span className="hidden xs:inline sm:inline">Acceder</span>
-                </Button>
-                {/* Ser conductor - visible en sm+ */}
-                <Link href="/registrarse" className="hidden sm:block">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
-                  >
-                    <Car className="mr-1.5 h-4 w-4" />
-                    Ser conductor
-                  </Button>
-                </Link>
-                {/* Menú hamburguesa en móvil */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="md:hidden"
-                  onClick={onMobileMenuOpen}
-                >
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Diálogo de Acceder con tabs Cliente / Conductor */}
-        <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-center text-xl">Acceder</DialogTitle>
-              <DialogDescription className="text-center text-muted-foreground">
-                Elige cómo quieres entrar
-              </DialogDescription>
-            </DialogHeader>
-            <Tabs defaultValue="cliente" className="mt-2">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="cliente" className="gap-1.5">
-                  <User className="h-4 w-4" />
-                  Cliente
-                </TabsTrigger>
-                <TabsTrigger value="conductor" className="gap-1.5">
-                  <Car className="h-4 w-4" />
-                  Conductor
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="cliente" className="mt-6">
-                <div className="space-y-4">
-                  <div className="text-center mb-4">
-                    <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-yellow-400/10 flex items-center justify-center">
-                      <User className="h-8 w-8 text-yellow-400" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Busca taxis, reserva viajes y gestiona tus reservas
-                    </p>
-                  </div>
-                  <Link href="/cuenta" onClick={() => setShowLoginDialog(false)}>
-                    <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500 h-12 text-base">
-                      Iniciar sesión como cliente
-                    </Button>
-                  </Link>
-                  <Link href="/cuenta" onClick={() => setShowLoginDialog(false)}>
-                    <Button variant="outline" className="w-full h-12 text-base">
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Crear cuenta de cliente
-                    </Button>
-                  </Link>
-                </div>
-              </TabsContent>
-              <TabsContent value="conductor" className="mt-6">
-                <div className="space-y-4">
-                  <div className="text-center mb-4">
-                    <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-yellow-400/10 flex items-center justify-center">
-                      <Car className="h-8 w-8 text-yellow-400" />
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      Gestiona tu perfil, GPS, rutas y reservas
-                    </p>
-                  </div>
-                  <Link href="/login" onClick={() => setShowLoginDialog(false)}>
-                    <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500 h-12 text-base">
-                      Iniciar sesión como conductor
-                    </Button>
-                  </Link>
-                  <Link href="/registrarse" onClick={() => setShowLoginDialog(false)}>
-                    <Button variant="outline" className="w-full h-12 text-base">
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Crear perfil de conductor
-                    </Button>
-                  </Link>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-  }
-
-  // ===== LOGGED IN: Show "Cuenta" + "Registrarse" =====
-  const cuentaHref = sessionType === 'client' ? '/cuenta' : `/dashboard/${JSON.parse(localStorage.getItem('eitaxi_session') || '{}').driverId || ''}`;
+  const t = useTranslations('header');
+  const tCommon = useTranslations('common');
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur-xl">
@@ -471,7 +295,7 @@ function Header({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-1">
-                  Cantones <ChevronDown className="h-4 w-4" />
+                  {t('cantons')} <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 max-h-80 overflow-y-auto">
@@ -487,32 +311,40 @@ function Header({
                     </Badge>
                   </DropdownMenuItem>
                 )) : (
-                  <DropdownMenuItem disabled>Cargando...</DropdownMenuItem>
+                  <DropdownMenuItem disabled>{tCommon('loading')}</DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-2">
-            {/* Cuenta - logged in */}
-            <Link href={cuentaHref}>
-              <Button variant="ghost" size="sm" className="text-sm">
-                <User className="mr-1.5 h-4 w-4" />
-                <span className="hidden sm:inline">Cuenta</span>
-                <span className="sm:hidden">Cuenta</span>
+            {/* Mi reserva - seguimiento público */}
+            <Link href="/seguimiento" className="hidden sm:block">
+              <Button variant="ghost" size="sm" className="text-sm gap-1">
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('tracking')}</span>
               </Button>
             </Link>
-            {/* Registrarse - al lado */}
+            {/* Iniciar sesion - login unificado */}
+            <Link href="/login">
+              <Button variant="ghost" size="sm" className="text-sm gap-1">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('loginButton')}</span>
+              </Button>
+            </Link>
+            {/* Ser conductor visible en sm+ */}
             <Link href="/registrarse" className="hidden sm:block">
               <Button
                 variant="outline"
                 size="sm"
                 className="border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-black"
               >
-                <UserPlus className="mr-1.5 h-4 w-4" />
-                Registrarse
+                <Car className="mr-2 h-4 w-4" />
+                {t('register')}
               </Button>
             </Link>
+            {/* Language Switcher */}
+            <LanguageSwitcher />
             {/* Menú hamburguesa en móvil */}
             <Button
               variant="ghost"
@@ -564,6 +396,7 @@ function LocationInput({
   onSelect,
   icon: Icon,
   showHistoryAndFavorites = false,
+  selectedSuggestion,
 }: {
   placeholder: string;
   value: string;
@@ -571,8 +404,13 @@ function LocationInput({
   onSelect: (suggestion: LocationSuggestion) => void;
   icon: typeof MapPin;
   showHistoryAndFavorites?: boolean;
+  selectedSuggestion?: LocationSuggestion | null;
 }) {
+  const tSearch = useTranslations('search');
+  const tGeo = useTranslations('geo');
+  const tCommon = useTranslations('common');
   const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [favSuggestions, setFavSuggestions] = useState<LocationSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [geoLoading, setGeoLoading] = useState(false);
@@ -596,32 +434,68 @@ function LocationInput({
       return;
     }
 
+    // Si ya hay una selección restaurada con coordenadas, no buscar sugerencias
+    if (selectedSuggestion?.lat && selectedSuggestion?.lon) {
+      setShowSuggestions(false);
+      setSuggestions([]);
+      setFavSuggestions([]);
+      return;
+    }
+
     const timeoutId = setTimeout(async () => {
       if (value.trim().length >= 2) {
         setLoading(true);
         setFromCache(false);
-        try {
-          const res = await fetch(`/api/locations?q=${encodeURIComponent(value.trim())}`);
-          const data = await res.json();
-          if (data.success) {
-            const results = Array.isArray(data.data) ? data.data : (data.data.combined || []);
-            setSuggestions(results);
-            setFromCache(data.fromCache || false);
-            setShowSuggestions(true);
-          }
-        } catch (error) {
-          console.error('Error fetching suggestions:', error);
-        } finally {
-          setLoading(false);
+
+        // Parallel search: favorites from DB + geocoding
+        const [favRes, geoRes] = await Promise.allSettled([
+          fetch(`/api/addresses/suggestions?q=${encodeURIComponent(value.trim())}`).then(r => r.json()),
+          fetch(`/api/locations?q=${encodeURIComponent(value.trim())}`).then(r => r.json()),
+        ]);
+
+        // Process favorites from DB
+        if (favRes.status === 'fulfilled' && favRes.value?.success && Array.isArray(favRes.value.data)) {
+          setFavSuggestions(favRes.value.data);
+        } else {
+          setFavSuggestions([]);
         }
+
+        // Process geocoding results
+        if (geoRes.status === 'fulfilled' && geoRes.value?.success) {
+          const results = Array.isArray(geoRes.value.data) ? geoRes.value.data : (geoRes.value.data?.combined || []);
+          setSuggestions(results);
+          setFromCache(geoRes.value.fromCache || false);
+          setShowSuggestions(true);
+
+          // Si Photon tardó y tuvimos pocos resultados, refrescar después de 5s
+          if (!geoRes.value.fromCache && results.length <= 2) {
+            setTimeout(async () => {
+              try {
+                const refetch = await fetch(`/api/locations?q=${encodeURIComponent(value.trim())}`);
+                const refetchData = await refetch.json();
+                if (refetchData.success && refetchData.data.length > results.length) {
+                  setSuggestions(refetchData.data);
+                  setFromCache(refetchData.fromCache || false);
+                  setShowSuggestions(true);
+                }
+              } catch {}
+            }, 5000);
+          }
+        } else {
+          setSuggestions([]);
+          setShowSuggestions(true);
+        }
+
+        setLoading(false);
       } else {
         setSuggestions([]);
+        setFavSuggestions([]);
         setShowSuggestions(false);
       }
-    }, 300);
+    }, 150);
 
-    return () => clearTimeout(timeoutId);
-  }, [value]);
+    return () => { clearTimeout(timeoutId); };
+  }, [value, selectedSuggestion]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -663,13 +537,14 @@ function LocationInput({
     onChange(displayValue);
     setShowSuggestions(false);
     setSuggestions([]);
+    setFavSuggestions([]);
     addToHistory(suggestion);
     onSelect(suggestion);
   };
 
   const handleGetCurrentLocation = () => {
     if (!navigator.geolocation) {
-      alert('Tu navegador no soporta geolocalización');
+      alert(tGeo('notSupported'));
       return;
     }
 
@@ -684,7 +559,7 @@ function LocationInput({
           if (data.success) {
             const suggestion: LocationSuggestion = {
               id: `geo-${Date.now()}`,
-              name: data.name || 'Mi ubicación',
+              name: data.name || tGeo('myLocation'),
               type: 'address',
               lat: latitude,
               lon: longitude,
@@ -699,24 +574,24 @@ function LocationInput({
             handleSelect(suggestion);
           } else {
             // Mostrar error de la API
-            alert(data.error || 'No se pudo obtener tu dirección. Intenta escribir manualmente.');
+            alert(data.error || tGeo('addressError'));
           }
         } catch (error) {
           console.error('Reverse geocoding error:', error);
-          alert('Error al obtener tu dirección. Intenta escribir manualmente.');
+          alert(tGeo('addressErrorGeneric'));
         } finally {
           setGeoLoading(false);
         }
       },
       (error) => {
         console.error('Geolocation error:', error);
-        let errorMsg = 'No se pudo obtener tu ubicación.';
+        let errorMsg = tGeo('locationError');
         if (error.code === error.PERMISSION_DENIED) {
-          errorMsg = 'Permiso de ubicación denegado. Actívalo en la configuración del navegador.';
+          errorMsg = tGeo('permissionDenied');
         } else if (error.code === error.POSITION_UNAVAILABLE) {
-          errorMsg = 'Ubicación no disponible en este dispositivo.';
+          errorMsg = tGeo('positionUnavailable');
         } else if (error.code === error.TIMEOUT) {
-          errorMsg = 'Tiempo de espera agotado al obtener ubicación.';
+          errorMsg = tGeo('timeout');
         }
         alert(errorMsg);
         setGeoLoading(false);
@@ -739,7 +614,7 @@ function LocationInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => {
-            if (value.trim().length >= 2 && suggestions.length > 0) {
+            if (value.trim().length >= 2 && (suggestions.length > 0 || favSuggestions.length > 0)) {
               setShowSuggestions(true);
             } else if (showHistoryAndFavorites && (history.length > 0 || favorites.length > 0)) {
               setShowSuggestions(true);
@@ -749,7 +624,7 @@ function LocationInput({
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
           {fromCache && (
-            <span className="text-xs text-yellow-400 mr-1" title="Desde caché">📦</span>
+            <span className="text-xs text-yellow-400 mr-1" title={tGeo('fromCache')}>📦</span>
           )}
           {loading && !geoLoading && (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -773,7 +648,7 @@ function LocationInput({
                 ? 'bg-yellow-400/20 animate-pulse' 
                 : 'hover:bg-yellow-400/10'
             }`}
-            title="Usar mi ubicación"
+            title={tGeo('useMyLocation')}
           >
             {geoLoading ? (
               <Loader2 className="h-4 w-4 text-yellow-400 animate-spin" />
@@ -793,27 +668,27 @@ function LocationInput({
                 <Crosshair className="h-6 w-6 text-yellow-400" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">Usar mi ubicación</h3>
-                <p className="text-sm text-muted-foreground">Permiso de ubicación</p>
+                <h3 className="font-semibold text-lg">{tGeo('title')}</h3>
+                <p className="text-sm text-muted-foreground">{tGeo('permissionLabel')}</p>
               </div>
             </div>
             
             <p className="text-sm text-muted-foreground mb-4">
-              Permitir que eitaxi acceda a tu ubicación para:
+              {tGeo('consentText')}
             </p>
             
             <ul className="text-sm space-y-2 mb-6">
               <li className="flex items-start gap-2">
                 <MapPin className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                <span>Mostrarte taxis disponibles cerca de ti</span>
+                <span>{tGeo('description1')}</span>
               </li>
               <li className="flex items-start gap-2">
                 <Navigation className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                <span>Calcular distancias y rutas automáticamente</span>
+                <span>{tGeo('description2')}</span>
               </li>
               <li className="flex items-start gap-2">
                 <Shield className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                <span>Tu ubicación solo se usa mientras usas la web</span>
+                <span>{tGeo('description3')}</span>
               </li>
             </ul>
             
@@ -823,7 +698,7 @@ function LocationInput({
                 className="flex-1"
                 onClick={() => setShowGeoConsent(false)}
               >
-                Cancelar
+                {tCommon('cancel')}
               </Button>
               <Button
                 className="flex-1 bg-yellow-400 text-black hover:bg-yellow-500"
@@ -833,12 +708,12 @@ function LocationInput({
                 }}
               >
                 <Crosshair className="mr-2 h-4 w-4" />
-                Permitir
+                {tGeo('allow')}
               </Button>
             </div>
             
             <p className="text-xs text-muted-foreground text-center mt-4">
-              Tu ubicación no se guarda ni se comparte con terceros
+              {tGeo('privacyNote')}
             </p>
           </div>
         </div>
@@ -852,7 +727,7 @@ function LocationInput({
               {favorites.length > 0 && (
                 <div className="border-b border-border">
                   <div className="px-4 py-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Heart className="h-3 w-3" /> Favoritos
+                    <Heart className="h-3 w-3" /> {tSearch('favorites')}
                   </div>
                   {favorites.slice(0, 5).map((item) => (
                     <button
@@ -877,7 +752,7 @@ function LocationInput({
               {history.length > 0 && (
                 <div>
                   <div className="px-4 py-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <History className="h-3 w-3" /> Recientes
+                    <History className="h-3 w-3" /> {tSearch('recent')}
                   </div>
                   {history.slice(0, 5).map((item) => (
                     <button
@@ -902,11 +777,39 @@ function LocationInput({
             </>
           )}
 
-          {/* Search results */}
+          {/* Saved addresses from DB (favorites) */}
+          {favSuggestions.length > 0 && (
+            <div className="border-b border-border">
+              <div className="px-4 py-2 text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Heart className="h-3 w-3 text-red-400" /> {tSearch('savedAddresses')}
+              </div>
+              {favSuggestions.map((item, idx) => (
+                <button
+                  key={`dbfav-${item.id}-${idx}`}
+                  type="button"
+                  onClick={() => handleSelect(item)}
+                  className="w-full px-4 py-3 flex items-center gap-3 hover:bg-yellow-400/10 transition-colors text-left"
+                >
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <Heart className="h-4 w-4 text-red-400 fill-red-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium">{item.name}</div>
+                    <div className="text-sm text-muted-foreground truncate">
+                      {item.shortAddress || item.fullAddress}
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Search results from geocoding */}
           {loading ? (
             <div className="p-4 text-center text-muted-foreground">
               <div className="animate-spin h-5 w-5 border-2 border-yellow-400 border-t-transparent rounded-full mx-auto mb-2"></div>
-              Buscando...
+              {tSearch('placeholder')}
             </div>
           ) : suggestions.length > 0 ? (
             <div className="py-2">
@@ -929,14 +832,14 @@ function LocationInput({
                     return suggestion.shortAddress;
                   }
                   if (suggestion.type === 'canton') {
-                    return `${suggestion.country === 'LI' ? '🇱🇮 Liechtenstein' : '🇨🇭 Cantón'}${suggestion.code ? ` (${suggestion.code})` : ''}`;
+                    return `${suggestion.country === 'LI' ? '🇱🇮 Liechtenstein' : '🇨🇭 ' + tSearch('canton')}${suggestion.code ? ` (${suggestion.code})` : ''}`;
                   }
                   const cityName = suggestion.city || suggestion.cityName;
                   const stateName = suggestion.state || suggestion.cantonName;
                   if (suggestion.typeName) {
                     return `${suggestion.typeName}${cityName ? ` · ${cityName}` : ''}${stateName ? ` · ${stateName}` : ''}`;
                   }
-                  return `${cityName || 'Suiza'}${stateName ? ` · ${stateName}` : ''}`;
+                  return `${cityName || tSearch('switzerland')}${stateName ? ` · ${stateName}` : ''}`;
                 };
 
                 return (
@@ -962,7 +865,7 @@ function LocationInput({
             </div>
           ) : value.trim().length >= 2 ? (
             <div className="p-4 text-center text-muted-foreground">
-              No se encontraron ubicaciones
+              {tSearch('noResults')}
             </div>
           ) : null}
         </div>
@@ -972,14 +875,109 @@ function LocationInput({
 }
 
 // ============================================
+// STOP SUGGESTIONS COMPONENT (for intermediate stops)
+// ============================================
+function StopSuggestions({
+  query,
+  onSelect,
+}: {
+  query: string;
+  onSelect: (suggestion: LocationSuggestion) => void;
+}) {
+  const [suggestions, setSuggestions] = useState<LocationSuggestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (query.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/locations?q=${encodeURIComponent(query.trim())}`, { signal: AbortSignal.timeout(8000) });
+        const data = await res.json();
+        if (data.success) {
+          const results = Array.isArray(data.data) ? data.data : (data.data.combined || []);
+          setSuggestions(results);
+          setShowSuggestions(results.length > 0);
+        }
+      } catch {
+        // silent
+      } finally {
+        setLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timeoutId);
+  }, [query]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (!showSuggestions && !loading) return null;
+
+  return (
+    <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-xl z-30 max-h-56 overflow-y-auto" ref={containerRef}>
+      {loading ? (
+        <div className="p-3 text-center text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+        </div>
+      ) : (
+        <div className="py-1">
+          {suggestions.slice(0, 5).map((suggestion, index) => (
+            <button
+              key={`${suggestion.type}-${suggestion.id}-${index}`}
+              type="button"
+              onClick={() => {
+                let displayValue = suggestion.shortAddress || suggestion.fullAddress || suggestion.name;
+                if (suggestion.poiName) displayValue = suggestion.shortAddress || suggestion.poiName;
+                onSelect(suggestion);
+                setShowSuggestions(false);
+              }}
+              className="w-full px-3 py-2 flex items-center gap-2 hover:bg-blue-400/10 transition-colors text-left"
+            >
+              <CircleDot className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{suggestion.name}</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {suggestion.shortAddress || suggestion.fullAddress || suggestion.city}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
 // HERO SECTION
 // ============================================
+export interface StopData {
+  suggestion: LocationSuggestion;
+  text: string;
+}
+
 interface TripSearchData {
   origin: LocationSuggestion | null;
   destination: LocationSuggestion | null;
   originText: string;
   destinationText: string;
   routeInfo?: RouteInfo | null;
+  stops?: StopData[];
 }
 
 interface RouteInfo {
@@ -991,32 +989,74 @@ interface RouteInfo {
 
 function HeroSection({
   onSearch,
+  initialOriginText: initOriginText,
+  initialDestinationText: initDestText,
+  initOrigin,
+  initDestination,
+  initRouteInfo,
 }: {
   onSearch: (data: TripSearchData) => void;
+  initialOriginText?: string;
+  initialDestinationText?: string;
+  initOrigin?: LocationSuggestion | null;
+  initDestination?: LocationSuggestion | null;
+  initRouteInfo?: RouteInfo | null;
 }) {
-  const [originText, setOriginText] = useState("");
-  const [destinationText, setDestinationText] = useState("");
-  const [origin, setOrigin] = useState<LocationSuggestion | null>(null);
-  const [destination, setDestination] = useState<LocationSuggestion | null>(null);
+  const tHero = useTranslations('hero');
+  const tRoute = useTranslations('route');
+  const tStats = useTranslations('stats');
+  const tLoc = useTranslations('locationTypes');
+  const tRouteMap = useTranslations('routeMap');
+  const tCommon = useTranslations('common');
+
+  const [originText, setOriginText] = useState(initOriginText || "");
+  const [destinationText, setDestinationText] = useState(initDestText || "");
+  const [origin, setOrigin] = useState<LocationSuggestion | null>(initOrigin || null);
+  const [destination, setDestination] = useState<LocationSuggestion | null>(initDestination || null);
+  const [stops, setStops] = useState<StopData[]>([]);
   const [showMap, setShowMap] = useState(false);
-  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(initRouteInfo || null);
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
 
-  // Calcular ruta automáticamente
+  const quickPOIs = getQuickPOIs(tLoc);
+  const autoSearchRef = useRef(false);
+
+  // Sincronizar props restauradas (después de useEffect del padre)
+  useEffect(() => {
+    if (initOriginText && initOriginText !== originText) setOriginText(initOriginText);
+    if (initDestText && initDestText !== destinationText) setDestinationText(initDestText);
+    // Restaurar objetos de ubicación y ruta para auto-search
+    if (initOrigin && !origin) setOrigin(initOrigin);
+    if (initDestination && !destination) setDestination(initDestination);
+    if (initRouteInfo && !routeInfo) {
+      setRouteInfo(initRouteInfo);
+      // Resetear autoSearchRef para que el auto-search se dispare con datos restaurados
+      autoSearchRef.current = false;
+    }
+  }, [initOriginText, initDestText, initOrigin, initDestination, initRouteInfo]);
+
+  // Calcular ruta automáticamente (saltar si ya hay routeInfo restaurado)
   useEffect(() => {
     let cancelled = false;
     
     const calculateRoute = async () => {
+      // Si ya tenemos routeInfo restaurado y las coordenadas coinciden, no recalcular
+      if (routeInfo?.geometry && initRouteInfo?.geometry && !loadingRoute) return;
       if (origin?.lat && origin?.lon && destination?.lat && destination?.lon) {
         setLoadingRoute(true);
         setRouteError(null);
         
         try {
-          const res = await fetch(
-            `/api/route?fromLat=${origin.lat}&fromLon=${origin.lon}&toLat=${destination.lat}&toLon=${destination.lon}`,
-            { signal: AbortSignal.timeout(12000) } // 12 segundos max
-          );
+          // Build waypoints param from stops
+          const allStopsReady = stops.every(s => s.suggestion.lat && s.suggestion.lon);
+          let url = `/api/route?fromLat=${origin.lat}&fromLon=${origin.lon}&toLat=${destination.lat}&toLon=${destination.lon}`;
+          if (allStopsReady && stops.length > 0) {
+            const wpStr = stops.map(s => `${s.suggestion.lat},${s.suggestion.lon}`).join(';');
+            url += `&waypoints=${wpStr}`;
+          }
+          
+          const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
           const result = await res.json();
           
           if (cancelled) return;
@@ -1025,12 +1065,12 @@ function HeroSection({
             setRouteInfo(result.data);
             setRouteError(null);
           } else {
-            setRouteError(result.error || 'Error al calcular ruta');
+            setRouteError(result.error || tRoute('calcError'));
             setRouteInfo(null);
           }
         } catch (e) {
           if (cancelled) return;
-          setRouteError('Error de conexión');
+          setRouteError(tRoute('connectionError'));
           setRouteInfo(null);
         } finally {
           if (!cancelled) setLoadingRoute(false);
@@ -1045,7 +1085,7 @@ function HeroSection({
     calculateRoute();
     
     return () => { cancelled = true; };
-  }, [origin?.lat, origin?.lon, destination?.lat, destination?.lon]);
+  }, [origin?.lat, origin?.lon, destination?.lat, destination?.lon, stops.map(s => `${s.suggestion.lat},${s.suggestion.lon}`).join(';')]);
 
   const handleSwap = () => {
     const tempText = originText;
@@ -1064,9 +1104,55 @@ function HeroSection({
         originText: originText.trim(),
         destinationText: destinationText.trim(),
         routeInfo,
+        stops: stops.length > 0 ? stops : undefined,
       });
     }
   };
+
+  const addStop = () => {
+    if (stops.length >= 3) return;
+    setStops([...stops, { suggestion: { id: '', name: '', type: 'address' }, text: '' }]);
+  };
+
+  const removeStop = (index: number) => {
+    setStops(stops.filter((_, i) => i !== index));
+  };
+
+  const updateStopText = (index: number, text: string) => {
+    const newStops = [...stops];
+    newStops[index] = { ...newStops[index], text };
+    setStops(newStops);
+  };
+
+  const updateStopSuggestion = (index: number, suggestion: LocationSuggestion) => {
+    const newStops = [...stops];
+    let displayValue = suggestion.shortAddress || suggestion.fullAddress || suggestion.name || suggestion.street || suggestion.name;
+    if (suggestion.poiName) displayValue = suggestion.shortAddress || suggestion.poiName;
+    newStops[index] = { suggestion, text: displayValue };
+    setStops(newStops);
+  };
+
+  // Auto-buscar cuando ambos campos tengan coordenadas y la ruta esté calculada
+  useEffect(() => {
+    if (autoSearchRef.current) return;
+    // Solo auto-buscar si tenemos texto en ambos, coordenadas en ambos, y ruta calculada
+    if (
+      originText.trim() && destinationText.trim() &&
+      origin?.lat && origin?.lon &&
+      destination?.lat && destination?.lon &&
+      routeInfo?.geometry && !loadingRoute
+    ) {
+      autoSearchRef.current = true;
+      onSearch({
+        origin,
+        destination,
+        originText: originText.trim(),
+        destinationText: destinationText.trim(),
+        routeInfo,
+        stops: stops.length > 0 ? stops : undefined,
+      });
+    }
+  }, [origin?.lat, origin?.lon, destination?.lat, destination?.lon, routeInfo?.geometry, loadingRoute, stops.every(s => !!s.suggestion.lat)]);
 
   return (
     <section className="relative overflow-hidden py-16 md:py-24">
@@ -1079,17 +1165,17 @@ function HeroSection({
             className="mb-6 border-yellow-400/30 bg-yellow-400/10 text-yellow-400"
           >
             <Zap className="mr-1 h-3 w-3" />
-            Conecta con conductores verificados en segundos
+            {tHero('badge')}
           </Badge>
 
           <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-            Tu taxi en <span className="text-yellow-400">Suiza</span>
+            {tHero('title', { country: '' })} <span className="text-yellow-400">{tHero('titleHighlight')}</span>
             <br />
-            a un clic de distancia
+            {tHero('subtitleContinuation')}
           </h1>
 
           <p className="text-lg md:text-xl text-gray-400 mb-10 max-w-2xl mx-auto">
-            ¿Dónde estás y a dónde quieres ir? Encuentra taxistas profesionales para tu viaje.
+            {tHero('subtitle')}
           </p>
 
           {/* From/To Search */}
@@ -1098,7 +1184,7 @@ function HeroSection({
               <div className="space-y-3">
                 {/* Origin */}
                 <LocationInput
-                  placeholder="¿Desde dónde quieres salir?"
+                  placeholder={tHero('originPlaceholder')}
                   value={originText}
                   onChange={setOriginText}
                   onSelect={(s) => {
@@ -1106,6 +1192,7 @@ function HeroSection({
                   }}
                   icon={Navigation}
                   showHistoryAndFavorites={true}
+                  selectedSuggestion={origin}
                 />
 
                 {/* Swap Button */}
@@ -1113,21 +1200,67 @@ function HeroSection({
                   <button
                     onClick={handleSwap}
                     className="p-2 rounded-full bg-yellow-400/10 hover:bg-yellow-400/20 transition-colors"
-                    title="Intercambiar origen y destino"
+                    title={tHero('swapTooltip')}
                   >
                     <ArrowLeftRight className="h-5 w-5 text-yellow-400" />
                   </button>
                 </div>
 
+                {/* Intermediate Stops */}
+                {stops.map((stop, index) => (
+                  <div key={`stop-${index}`} className="relative">
+                    <div className="flex items-center gap-2">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-blue-400">{index + 1}</span>
+                      </div>
+                      <div className="flex-1 relative">
+                        <Input
+                          type="text"
+                          placeholder={tHero('stopPlaceholder') + ` (${index + 1})`}
+                          value={stop.text}
+                          onChange={(e) => updateStopText(index, e.target.value)}
+                          className="pl-12 pr-10 h-12 text-base bg-card border-border focus:border-blue-400 focus:ring-blue-400/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeStop(index)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-red-500/10 rounded-full transition-colors"
+                          title={tHero('removeStop')}
+                        >
+                          <X className="h-4 w-4 text-muted-foreground hover:text-red-400" />
+                        </button>
+                      </div>
+                    </div>
+                    {/* Inline suggestions for stop */}
+                    <StopSuggestions
+                      query={stop.text}
+                      onSelect={(suggestion) => updateStopSuggestion(index, suggestion)}
+                    />
+                  </div>
+                ))}
+
+                {/* Add Stop Button */}
+                {stops.length < 3 && (
+                  <button
+                    type="button"
+                    onClick={addStop}
+                    className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-border hover:border-blue-400/50 hover:bg-blue-400/5 transition-colors text-sm text-muted-foreground hover:text-blue-400"
+                  >
+                    <Plus className="h-4 w-4" />
+                    {tHero('addStop')}
+                  </button>
+                )}
+
                 {/* Destination */}
                 <LocationInput
-                  placeholder="¿A dónde quieres ir?"
+                  placeholder={tHero('destinationPlaceholder')}
                   value={destinationText}
                   onChange={setDestinationText}
                   onSelect={(s) => {
                     setDestination(s);
                   }}
                   icon={MapPin}
+                  selectedSuggestion={destination}
                 />
               </div>
 
@@ -1135,7 +1268,7 @@ function HeroSection({
               {loadingRoute && (
                 <div className="mt-4 p-3 bg-yellow-400/10 rounded-lg flex items-center justify-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-yellow-400" />
-                  <span className="text-sm">Calculando ruta real...</span>
+                  <span className="text-sm">{tRoute('calculating')}</span>
                 </div>
               )}
 
@@ -1155,7 +1288,7 @@ function HeroSection({
                         {routeInfo.distance}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        km estimados
+                        {tRoute('kmEstimated')}
                       </div>
                     </div>
                     {/* Duration */}
@@ -1164,28 +1297,28 @@ function HeroSection({
                         {routeInfo.duration}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        min estimados
+                        {tRoute('minApprox')}
                       </div>
                     </div>
                     {/* Price - rango amplio para estimación general */}
                     <div className="p-4 text-center">
                       <div className="text-2xl font-bold text-white">
                         {(() => {
-                          const basePrice = 5 + (routeInfo.distance * 2.5);
+                          const basePrice = 8 + (routeInfo.distance * 3.2);
                           const minPrice = Math.round(basePrice * 0.9); // -10%
                           const maxPrice = Math.round(basePrice * 1.3); // +30%
                           return `${minPrice}-${maxPrice}`;
                         })()}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        CHF estimado
+                        {tRoute('chfEstimated')}
                       </div>
                     </div>
                   </div>
                   {/* Disclaimer */}
                   <div className="px-4 py-2 bg-muted/30 border-t border-border">
                     <p className="text-xs text-muted-foreground">
-                      * El precio final lo establece cada taxista
+                      {tRoute('priceNote')}
                     </p>
                   </div>
                 </div>
@@ -1202,7 +1335,7 @@ function HeroSection({
                   >
                     <div className="flex items-center gap-2">
                       <MapIcon className="h-4 w-4 text-yellow-400" />
-                      <span className="text-sm font-medium">Ver mapa de la ruta</span>
+                      <span className="text-sm font-medium">{tRouteMap('viewRouteMap')}</span>
                     </div>
                     <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${showMap ? 'rotate-180' : ''}`} />
                   </button>
@@ -1213,27 +1346,34 @@ function HeroSection({
                         geometry={routeInfo.geometry}
                         origin={{ lat: origin.lat, lon: origin.lon }}
                         destination={{ lat: destination.lat, lon: destination.lon }}
+                        stops={stops.filter(s => s.suggestion.lat && s.suggestion.lon).map(s => ({ lat: s.suggestion.lat!, lon: s.suggestion.lon! }))}
                       />
                       <div className="absolute bottom-2 right-2 flex gap-2">
                         <a
-                          href={`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${origin.lat},${origin.lon};${destination.lat},${destination.lon}`}
+                          href={`https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${origin.lat},${origin.lon}${stops.filter(s => s.suggestion.lat && s.suggestion.lon).map(s => `;${s.suggestion.lat},${s.suggestion.lon}`).join('')};${destination.lat},${destination.lon}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-2 py-1 bg-background/90 rounded text-xs hover:bg-background"
                         >
                           <MapIcon className="h-3 w-3" />
-                          Abrir en OpenStreetMap
+                          {tRouteMap('openInOSM')}
                         </a>
                       </div>
                       {/* Leyenda */}
                       <div className="absolute top-2 left-2 flex gap-3 px-2 py-1 bg-background/80 rounded text-xs">
                         <div className="flex items-center gap-1">
                           <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                          <span>Origen</span>
+                          <span>{tRouteMap('origin')}</span>
                         </div>
+                        {stops.length > 0 && stops.filter(s => s.suggestion.lat).map((s, i) => (
+                          <div key={i} className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                            <span>{tRouteMap('stop', { number: i + 1 })}</span>
+                          </div>
+                        ))}
                         <div className="flex items-center gap-1">
                           <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                          <span>Destino</span>
+                          <span>{tRouteMap('dest')}</span>
                         </div>
                       </div>
                     </div>
@@ -1248,7 +1388,7 @@ function HeroSection({
                 disabled={!originText.trim() && !destinationText.trim()}
               >
                 <Search className="mr-2 h-5 w-5" />
-                Buscar taxis disponibles
+                {tHero('searchButton')}
               </Button>
 
               {/* Quick Options */}
@@ -1268,7 +1408,7 @@ function HeroSection({
                     });
                   }}
                 >
-                  <Plane className="mr-1 h-3 w-3" /> Desde aeropuerto
+                  <Plane className="mr-1 h-3 w-3" /> {tHero('fromAirport')}
                 </Badge>
                 <Badge
                   variant="outline"
@@ -1285,7 +1425,7 @@ function HeroSection({
                     });
                   }}
                 >
-                  <Plane className="mr-1 h-3 w-3" /> Al aeropuerto
+                  <Plane className="mr-1 h-3 w-3" /> {tHero('toAirport')}
                 </Badge>
                 <Badge
                   variant="outline"
@@ -1303,14 +1443,14 @@ function HeroSection({
                     });
                   }}
                 >
-                  🇱🇮 Liechtenstein
+                  🇱🇮 {tHero('liechtenstein')}
                 </Badge>
               </div>
 
               {/* Quick POIs */}
               <div className="flex flex-wrap gap-2 mt-3 justify-center border-t border-border pt-3">
-                <span className="text-xs text-muted-foreground w-full mb-1">Buscar cerca:</span>
-                {QUICK_POIS.map((poi) => (
+                <span className="text-xs text-muted-foreground w-full mb-1">{tCommon('nearby')}</span>
+                {quickPOIs.map((poi) => (
                   <Badge
                     key={poi.id}
                     variant="secondary"
@@ -1331,9 +1471,9 @@ function HeroSection({
           {/* Stats */}
           <div className="grid grid-cols-3 gap-6 mt-12 max-w-2xl mx-auto">
             {[
-              { value: "500+", label: "Conductores", icon: Users },
-              { value: "24/7", label: "Disponibilidad", icon: Clock },
-              { value: "100%", label: "Verificados", icon: Shield },
+              { value: "500+", label: tStats('drivers'), icon: Users },
+              { value: "24/7", label: tStats('availability'), icon: Clock },
+              { value: "100%", label: tStats('verified'), icon: Shield },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <stat.icon className="h-6 w-6 mx-auto mb-2 text-yellow-400" />
@@ -1354,10 +1494,25 @@ function HeroSection({
 function TaxiCard({
   driver,
   tripInfo,
+  onBook,
+  onChat,
+  toggleFavorite,
 }: {
   driver: TaxiDriver;
   tripInfo?: { distance: number; duration: number; durationFormatted: string; from: string; to: string };
+  onBook?: () => void;
+  onChat?: () => void;
+  toggleFavorite: (driverId: string) => void;
 }) {
+  const tCommon = useTranslations('common');
+  const tDrivers = useTranslations('drivers');
+  const tServices = useTranslations('services');
+  const tVehicles = useTranslations('vehicleTypes');
+  const tRoute = useTranslations('route');
+
+  const serviceConfig = getServiceConfig(tServices);
+  const vehicleTypeConfig = getVehicleTypeConfig(tVehicles);
+
   const handleCall = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1369,6 +1524,18 @@ function TaxiCard({
     e.stopPropagation();
     const phone = driver.whatsapp || driver.phone;
     window.open(`https://wa.me/${phone.replace(/\D/g, "")}`, "_blank");
+  };
+
+  const handleBook = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onBook?.();
+  };
+
+  const handleChat = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onChat?.();
   };
 
   const vehicleInfo = vehicleTypeConfig[driver.vehicleType] || vehicleTypeConfig.taxi;
@@ -1390,12 +1557,12 @@ function TaxiCard({
     }
     // Si el conductor solo tiene precio por km
     else if (driver.pricePerKm !== null && driver.pricePerKm !== undefined) {
-      const defaultBase = 5; // Precio base por defecto en Suiza
+      const defaultBase = 8; // Precio base por defecto en Suiza
       calculatedPrice = defaultBase + (distance * driver.pricePerKm);
     }
     // Si el conductor solo tiene precio base
     else if (driver.basePrice !== null && driver.basePrice !== undefined) {
-      const defaultPerKm = 3; // Precio por km por defecto en Suiza
+      const defaultPerKm = 3.2; // Precio por km por defecto en Suiza
       calculatedPrice = driver.basePrice + (distance * defaultPerKm);
     }
     // Si ya viene calculado de la API
@@ -1404,7 +1571,7 @@ function TaxiCard({
     }
     // Valores por defecto de Suiza (tarifa estándar)
     else {
-      calculatedPrice = 5 + (distance * 2.5);
+      calculatedPrice = 8 + (distance * 3.2);
     }
 
     // Aplicar rango con ~10% de margen
@@ -1415,8 +1582,21 @@ function TaxiCard({
 
   const estimatedPrice = getEstimatedPrice();
 
+  // Guardar estado de búsqueda antes de navegar al perfil del taxista
+  const handleCardClick = () => {
+    try {
+      const searchInputs = document.querySelectorAll('input');
+      const originText = searchInputs[0]?.value || '';
+      const destinationText = searchInputs[1]?.value || '';
+      sessionStorage.setItem('eitaxi_search_inputs', JSON.stringify({ originText, destinationText }));
+      // También guardar los drivers mostrados para restaurarlos al volver
+      const driversSection = document.getElementById('drivers-section');
+      sessionStorage.setItem('eitaxi_had_search', driversSection ? 'true' : 'false');
+    } catch {}
+  };
+
   return (
-    <Link href={profileUrl}>
+    <Link href={profileUrl} onClick={handleCardClick}>
       <Card className="group overflow-hidden border-border bg-card hover:border-yellow-400/50 transition-all duration-300 cursor-pointer h-full">
         <CardContent className="p-0">
           <div className="relative h-32 bg-gradient-to-br from-yellow-400/20 to-yellow-400/5 flex items-center justify-center overflow-hidden">
@@ -1430,17 +1610,29 @@ function TaxiCard({
               <Car className="h-16 w-16 text-yellow-400/40" />
             )}
 
+            {/* Badges lado izquierdo */}
             <div className="absolute top-3 left-3 flex gap-2 flex-wrap">
+              {/* Etiqueta de dirección: ida y vuelta o solo ida */}
+              {tripInfo && driver._directionType && (
+                <Badge className={`border-0 text-[11px] font-semibold ${
+                  driver._directionType === 'roundTrip'
+                    ? 'bg-emerald-500/90 text-white'
+                    : 'bg-amber-500/90 text-white'
+                }`}>
+                  <ArrowLeftRight className="mr-1 h-3 w-3" />
+                  {driver._directionType === 'roundTrip' ? tDrivers('roundTrip') : tDrivers('oneWay')}
+                </Badge>
+              )}
               {driver.isVerified && (
                 <Badge className="bg-green-500/90 text-white border-0">
                   <CheckCircle className="mr-1 h-3 w-3" />
-                  Verificado
+                  {tCommon('verified')}
                 </Badge>
               )}
               {driver.isTopRated && (
                 <Badge className="bg-yellow-400/90 text-black border-0">
                   <Award className="mr-1 h-3 w-3" />
-                  Top
+                  {tCommon('top')}
                 </Badge>
               )}
               {/* Marcador de coincidencia híbrida */}
@@ -1457,7 +1649,14 @@ function TaxiCard({
               )}
             </div>
 
-            <div className="absolute top-3 right-3 flex gap-2">
+            {/* Botón favorito + badges lado derecho (juntos y separados) */}
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+              {driver.isAvailable24h && (
+                <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+                  <Clock className="mr-1 h-3 w-3" />
+                  {tCommon('available24h')}
+                </Badge>
+              )}
               {driver.trackingEnabled && (
                 <button
                   onClick={(e) => {
@@ -1469,16 +1668,24 @@ function TaxiCard({
                 >
                   <Badge className="bg-red-500/90 text-white border-0 animate-pulse cursor-pointer hover:bg-red-500">
                     <Radio className="mr-1 h-3 w-3" />
-                    En vivo
+                    {tDrivers('live')}
                   </Badge>
                 </button>
               )}
-              {driver.isAvailable24h && (
-                <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-                  <Clock className="mr-1 h-3 w-3" />
-                  24/7
-                </Badge>
-              )}
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleFavorite(driver.id);
+                }}
+                className="p-1.5 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-sm transition-colors flex items-center gap-1"
+                title={tDrivers('favorite')}
+              >
+                <Heart className={`h-4 w-4 ${driver._isFavorite ? 'text-red-400 fill-red-400' : 'text-white/70 hover:text-red-400'}`} />
+                {driver._favoriteCount !== undefined && driver._favoriteCount > 0 && (
+                  <span className="text-[10px] font-bold text-white/90 leading-none">{driver._favoriteCount}</span>
+                )}
+              </button>
             </div>
 
             <div className="absolute bottom-3 left-3">
@@ -1504,7 +1711,7 @@ function TaxiCard({
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                   <span className="font-semibold">{driver.rating?.toFixed(1) || "5.0"}</span>
                 </div>
-                <p className="text-xs text-gray-500">{driver.experience} años</p>
+                <p className="text-xs text-gray-500">{driver.experience} {tDrivers('yearsExperience')}</p>
               </div>
             </div>
 
@@ -1514,22 +1721,22 @@ function TaxiCard({
                 <div className="grid grid-cols-3 divide-x divide-border text-center">
                   <div className="py-2 px-1">
                     <div className="text-lg font-bold text-yellow-400">{tripInfo.distance.toFixed(1)}</div>
-                    <div className="text-[10px] text-muted-foreground">km estimados</div>
+                    <div className="text-[10px] text-muted-foreground">{tRoute('kmEstimated')}</div>
                   </div>
                   <div className="py-2 px-1">
                     <div className="text-lg font-bold text-green-400">{tripInfo.duration}</div>
-                    <div className="text-[10px] text-muted-foreground">min estimados</div>
+                    <div className="text-[10px] text-muted-foreground">{tRoute('minApprox')}</div>
                   </div>
                   <div className="py-2 px-1">
                     <div className="text-lg font-bold">
                       {estimatedPrice ? `${(estimatedPrice as any).minPrice || (estimatedPrice as any).min}-${(estimatedPrice as any).maxPrice || (estimatedPrice as any).max}` : '-'}
                     </div>
-                    <div className="text-[10px] text-muted-foreground">CHF estimado</div>
+                    <div className="text-[10px] text-muted-foreground">{tRoute('chfEstimated')}</div>
                   </div>
                 </div>
                 <div className="py-1.5 px-2 bg-muted/30 border-t border-border">
                   <p className="text-[10px] text-muted-foreground text-center">
-                    * El precio final lo establece cada taxista
+                    {tRoute('priceNote')}
                   </p>
                 </div>
               </div>
@@ -1563,7 +1770,7 @@ function TaxiCard({
                 onClick={handleCall}
               >
                 <Phone className="mr-1.5 h-4 w-4" />
-                Llamar
+                {tDrivers('call')}
               </Button>
               <Button
                 size="sm"
@@ -1572,9 +1779,31 @@ function TaxiCard({
                 onClick={handleWhatsApp}
               >
                 <MessageCircle className="mr-1.5 h-4 w-4" />
-                WhatsApp
+                {tCommon('whatsapp')}
               </Button>
+              {onChat && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white"
+                  onClick={handleChat}
+                >
+                  <MessageCircle className="mr-1.5 h-4 w-4" />
+                  {tDrivers('chat') || 'Chat'}
+                </Button>
+              )}
             </div>
+
+            {/* Book button — full width, below the action row */}
+            {onBook && (
+              <Button
+                className="w-full mt-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-500 hover:to-yellow-600 font-semibold py-5"
+                onClick={handleBook}
+              >
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                {tDrivers('book')}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1596,14 +1825,17 @@ function MobileMenu({
   cantons: Canton[];
   onCantonSelect: (canton: Canton) => void;
 }) {
+  const t = useTranslations('header');
+  const tMobileMenu = useTranslations('mobileMenu');
+
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="left" className="w-[85vw] max-w-80 bg-card">
         <SheetHeader>
-          <SheetTitle className="text-left">Menú de Navegación</SheetTitle>
+          <SheetTitle className="text-left">{tMobileMenu('title')}</SheetTitle>
         </SheetHeader>
         <div className="py-6">
-          <h3 className="font-semibold text-lg mb-4">Cantones</h3>
+          <h3 className="font-semibold text-lg mb-4">{t('cantons')}</h3>
           <div className="space-y-2">
             {cantons.map((canton) => (
               <Button
@@ -1621,23 +1853,23 @@ function MobileMenu({
             ))}
           </div>
 
-          <div className="mt-8 pt-6 border-t border-border">
-            <Link href="/cuenta" onClick={onClose}>
-              <Button variant="outline" className="w-full mb-3 justify-start">
-                <User className="mr-2 h-4 w-4" />
-                Iniciar sesión (Cliente)
+          <div className="mt-8 pt-6 border-t border-border space-y-3">
+            <Link href="/seguimiento" onClick={onClose}>
+              <Button variant="ghost" className="w-full justify-start">
+                <Search className="mr-2 h-4 w-4" />
+                {t('tracking')}
               </Button>
             </Link>
             <Link href="/login" onClick={onClose}>
-              <Button variant="outline" className="w-full mb-3 justify-start">
-                <Car className="mr-2 h-4 w-4" />
-                Iniciar sesión (Conductor)
+              <Button variant="outline" className="w-full">
+                <User className="mr-2 h-4 w-4" />
+                {t('loginButton')}
               </Button>
             </Link>
             <Link href="/registrarse" onClick={onClose}>
-              <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500 justify-start">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Crear cuenta de conductor
+              <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
+                <Car className="mr-2 h-4 w-4" />
+                {t('register')}
               </Button>
             </Link>
           </div>
@@ -1654,6 +1886,7 @@ function ClientInstallButton() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [deviceType, setDeviceType] = useState<'ios' | 'android' | 'desktop'>('desktop');
   const [isStandalone, setIsStandalone] = useState(false);
+  const tInstall = useTranslations('install');
 
   useEffect(() => {
     const standalone = window.matchMedia('(display-mode: standalone)').matches
@@ -1686,7 +1919,7 @@ function ClientInstallButton() {
         className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium flex items-center gap-1"
       >
         <Download className="h-4 w-4" />
-        Descargar app
+        {tInstall('downloadApp')}
       </button>
 
       {showInstructions && (
@@ -1695,33 +1928,33 @@ function ClientInstallButton() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <Smartphone className="h-5 w-5 text-yellow-400" />
-                Instalar eitaxi
+                {tInstall('title')}
               </h3>
               <button onClick={() => setShowInstructions(false)} className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Ten eitaxi en tu móvil como una app. Busca taxis al instante desde tu pantalla de inicio.
+              {tInstall('description')}
             </p>
             {deviceType === 'ios' && (
               <div className="space-y-2 text-sm">
-                <p className="flex items-start gap-2"><span className="font-bold text-blue-400">1.</span> Toca el botón <strong>Compartir</strong> (cuadrado con flecha ↑ abajo a la izquierda)</p>
-                <p className="flex items-start gap-2"><span className="font-bold text-green-400">2.</span> Desliza y toca <strong>"Añadir a pantalla de inicio"</strong></p>
-                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">3.</span> Toca <strong>"Añadir"</strong> — ¡listo!</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-blue-400">1.</span> {tInstall('iosStep1')}</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-green-400">2.</span> {tInstall('iosStep2')}</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">3.</span> {tInstall('iosStep3')}</p>
               </div>
             )}
             {deviceType === 'android' && (
               <div className="space-y-2 text-sm">
-                <p className="flex items-start gap-2"><span className="font-bold text-gray-400">1.</span> Toca el <strong>menú ⋮</strong> arriba a la derecha</p>
-                <p className="flex items-start gap-2"><span className="font-bold text-green-400">2.</span> Toca <strong>"Añadir a pantalla de inicio"</strong></p>
-                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">3.</span> Confirma tocando <strong>"Añadir"</strong></p>
+                <p className="flex items-start gap-2"><span className="font-bold text-gray-400">1.</span> {tInstall('androidStep1')}</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-green-400">2.</span> {tInstall('androidStep2')}</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">3.</span> {tInstall('androidStep3')}</p>
               </div>
             )}
             {deviceType === 'desktop' && (
               <div className="space-y-2 text-sm">
-                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">1.</span> Busca el icono de <strong>instalar</strong> en la barra de direcciones</p>
-                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">2.</span> O usa el <strong>menú ⋮ → Instalar app</strong></p>
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">1.</span> {tInstall('desktopStep1')}</p>
+                <p className="flex items-start gap-2"><span className="font-bold text-yellow-400">2.</span> {tInstall('desktopStep2')}</p>
               </div>
             )}
             <button
@@ -1741,6 +1974,8 @@ function ClientInstallButton() {
 // FOOTER
 // ============================================
 function Footer() {
+  const tFooter = useTranslations('footer');
+
   return (
     <footer className="border-t border-border bg-card/50 mt-auto">
       <div className="container mx-auto px-4 py-8">
@@ -1760,20 +1995,20 @@ function Footer() {
             <ClientInstallButton />
             <span className="text-muted-foreground/50">•</span>
             <Link href="/privacidad" className="text-muted-foreground hover:text-foreground transition-colors">
-              Privacidad
+              {tFooter('privacy')}
             </Link>
             <span className="text-muted-foreground/50">•</span>
             <Link href="/terminos" className="text-muted-foreground hover:text-foreground transition-colors">
-              Términos
+              {tFooter('terms')}
             </Link>
             <span className="text-muted-foreground/50">•</span>
             <Link href="/registrarse" className="text-yellow-400 hover:text-yellow-300 transition-colors font-medium">
-              ¿Eres conductor? Únete
+              {tFooter('joinAsDriver')}
             </Link>
           </div>
           
           <p className="text-sm text-gray-500">
-            © 2026 eitaxi. Todos los derechos reservados.
+            {tFooter('copyright', { year: new Date().getFullYear().toString() })}
           </p>
         </div>
       </div>
@@ -1785,10 +2020,17 @@ function Footer() {
 // MAIN PAGE
 // ============================================
 export default function eitaxiPage() {
+  const pathname = usePathname();
+  const tDrivers = useTranslations('drivers');
+  const tCta = useTranslations('cta');
   const [drivers, setDrivers] = useState<TaxiDriver[]>([]);
   const [cantons, setCantons] = useState<Canton[]>([]);
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
+  const [bookingDriver, setBookingDriver] = useState<TaxiDriver | null>(null);
+  const [showChat, setShowChat] = useState(false);
+  const [chatDriver, setChatDriver] = useState<{ id: string; name: string } | null>(null);
   const [searchInfo, setSearchInfo] = useState<{
     from: string;
     to: string;
@@ -1796,34 +2038,137 @@ export default function eitaxiPage() {
     tripDuration?: number;
     tripDurationFormatted?: string;
   } | null>(null);
+  const [currentStops, setCurrentStops] = useState<Array<{ text: string; latitude?: number; longitude?: number }>>([]);
+  const [restoredInputs, setRestoredInputs] = useState<{ originText: string; destinationText: string } | null>(null);
+  const [restoredOrigin, setRestoredOrigin] = useState<LocationSuggestion | null>(null);
+  const [restoredDestination, setRestoredDestination] = useState<LocationSuggestion | null>(null);
+  const [restoredRouteInfo, setRestoredRouteInfo] = useState<RouteInfo | null>(null);
+  const [favoriteDriverIds, setFavoriteDriverIds] = useState<Set<string>>(new Set());
 
-  // Fetch initial data - separados con timeout individual para no bloquearse entre sí
+  // Cargar favoritos del cliente logueado (solo si hay sesión)
   useEffect(() => {
-    const fetchWithTimeout = async (url: string, ms: number) => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), ms);
+    const hasSession = document.cookie.split(';').some(c => c.trim().startsWith('eitaxi_client_session='));
+    if (!hasSession) return;
+    const fetchFavorites = async () => {
       try {
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeout);
-        return await res.json();
-      } catch (e) {
-        clearTimeout(timeout);
-        return null;
-      }
+        const res = await fetch('/api/client/favorites');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            setFavoriteDriverIds(new Set(data.data.map((f: any) => f.driverId)));
+          }
+        }
+      } catch {}
     };
+    fetchFavorites();
+  }, []);
 
+  // Sincronizar _isFavorite en los drivers cuando cambian favoritos
+  useEffect(() => {
+    if (favoriteDriverIds.size === 0) return;
+    setDrivers(prev => prev.map(d => ({
+      ...d,
+      _isFavorite: favoriteDriverIds.has(d.id)
+    })));
+  }, [favoriteDriverIds]);
+
+  // Toggle favorito
+  const handleToggleFavorite = useCallback(async (driverId: string) => {
+    const isFav = favoriteDriverIds.has(driverId);
+    try {
+      if (isFav) {
+        await fetch(`/api/client/favorites/${driverId}`, { method: 'DELETE' });
+        setFavoriteDriverIds(prev => { const next = new Set(prev); next.delete(driverId); return next; });
+      } else {
+        await fetch('/api/client/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ driverId }) });
+        setFavoriteDriverIds(prev => new Set(prev).add(driverId));
+      }
+      // Actualizar _isFavorite y _favoriteCount en los drivers
+      setDrivers(prev => prev.map(d => ({ 
+        ...d, 
+        _isFavorite: isFav ? false : true,
+        _favoriteCount: (d._favoriteCount || 0) + (isFav ? -1 : 1)
+      })));
+    } catch {}
+  }, [favoriteDriverIds]);
+
+  // Restaurar búsqueda al volver de perfil de taxista
+  useEffect(() => {
+    if (pathname !== '/') return;
+    if (typeof window === 'undefined') return;
+    try {
+      const savedInputs = sessionStorage.getItem('eitaxi_search_inputs');
+      const savedParams = sessionStorage.getItem('eitaxi_search_params');
+      const savedInfo = sessionStorage.getItem('eitaxi_search_info');
+      const savedOrigin = sessionStorage.getItem('eitaxi_saved_origin');
+      const savedDest = sessionStorage.getItem('eitaxi_saved_dest');
+      const savedRoute = sessionStorage.getItem('eitaxi_saved_route');
+
+      if (savedInputs && (savedParams || savedInfo)) {
+        const parsed = JSON.parse(savedInputs);
+        if (parsed.originText || parsed.destinationText) {
+          setRestoredInputs(parsed);
+
+          // Restaurar objetos de ubicación para que los inputs se vean seleccionados
+          if (savedOrigin) setRestoredOrigin(JSON.parse(savedOrigin));
+          if (savedDest) setRestoredDestination(JSON.parse(savedDest));
+          if (savedRoute) setRestoredRouteInfo(JSON.parse(savedRoute));
+
+          // Restaurar searchInfo para mostrar la info de la ruta
+          if (savedInfo) {
+            setSearchInfo(JSON.parse(savedInfo));
+          }
+
+          // Re-disparar la búsqueda directamente (como pulsar el botón)
+          if (savedParams) {
+            setLoading(true);
+            fetch(`/api/taxis/search?${savedParams}`)
+              .then(r => r.json())
+              .then(result => {
+                if (result.success) {
+                  setDrivers(result.data.map((d: any) => ({ ...d, _directionType: d.directionType })));
+                }
+              })
+              .catch(() => {})
+              .finally(() => {
+                setLoading(false);
+                setTimeout(() => {
+                  document.getElementById('drivers-section')?.scrollIntoView({ behavior: 'smooth' });
+                }, 300);
+              });
+          } else {
+            setTimeout(() => {
+              document.getElementById('drivers-section')?.scrollIntoView({ behavior: 'smooth' });
+            }, 300);
+          }
+        }
+        // NO borrar — re-guardar para que persista en siguientes navegaciones
+        if (savedParams) sessionStorage.setItem('eitaxi_search_params', savedParams);
+        if (savedInfo) sessionStorage.setItem('eitaxi_search_info', savedInfo);
+        if (savedInputs) sessionStorage.setItem('eitaxi_search_inputs', savedInputs);
+        if (savedOrigin) sessionStorage.setItem('eitaxi_saved_origin', savedOrigin);
+        if (savedDest) sessionStorage.setItem('eitaxi_saved_dest', savedDest);
+        if (savedRoute) sessionStorage.setItem('eitaxi_saved_route', savedRoute);
+      }
+    } catch {}
+  }, [pathname]);
+
+  // Fetch initial data
+  useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch conductores y cantones en paralelo con timeouts independientes
-        const [driversData, cantonsData] = await Promise.all([
-          fetchWithTimeout("/api/taxis", 10000),    // 10s timeout para taxis
-          fetchWithTimeout("/api/cantons", 8000),    // 8s timeout para cantones
+        const [driversRes, cantonsRes] = await Promise.all([
+          fetch("/api/taxis"),
+          fetch("/api/cantons"),
         ]);
 
-        if (driversData?.success) {
+        const driversData = await driversRes.json();
+        const cantonsData = await cantonsRes.json();
+
+        if (driversData.success) {
           setDrivers(driversData.data);
         }
-        if (cantonsData?.success) {
+        if (cantonsData.success) {
           setCantons(cantonsData.data);
         }
       } catch (error) {
@@ -1871,6 +2216,13 @@ export default function eitaxiPage() {
       tripDurationFormatted,
     });
 
+    // Save stops for booking modal (with coordinates)
+    setCurrentStops(data.stops?.map(s => ({
+      text: s.text,
+      latitude: s.suggestion?.lat,
+      longitude: s.suggestion?.lon,
+    })) || []);
+
     try {
       // Build search params
       const params = new URLSearchParams();
@@ -1905,7 +2257,23 @@ export default function eitaxiPage() {
       console.log('🔍 Nombres:', result.data?.map((d: any) => d.name));
 
       if (result.success) {
-        setDrivers(result.data);
+        const mappedDrivers = result.data.map((d: any) => ({
+          ...d,
+          _directionType: d.directionType,
+        }));
+        setDrivers(mappedDrivers);
+
+        // Guardar params de búsqueda para restaurar al volver de perfil
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('eitaxi_search_params', params.toString());
+            const infoToSave = { from: data.originText, to: data.destinationText, tripDistance, tripDuration, tripDurationFormatted };
+            sessionStorage.setItem('eitaxi_search_info', JSON.stringify(infoToSave));
+            sessionStorage.setItem('eitaxi_saved_origin', JSON.stringify(data.origin));
+            sessionStorage.setItem('eitaxi_saved_dest', JSON.stringify(data.destination));
+            if (data.routeInfo) sessionStorage.setItem('eitaxi_saved_route', JSON.stringify(data.routeInfo));
+          } catch {}
+        }
       }
     } catch (error) {
       console.error("Error searching:", error);
@@ -1926,6 +2294,11 @@ export default function eitaxiPage() {
       <main className="flex-1">
         <HeroSection
           onSearch={handleSearch}
+          initialOriginText={restoredInputs?.originText}
+          initialDestinationText={restoredInputs?.destinationText}
+          initOrigin={restoredOrigin}
+          initDestination={restoredDestination}
+          initRouteInfo={restoredRouteInfo}
         />
 
         <section id="drivers-section" className="py-12 md:py-16">
@@ -1935,12 +2308,12 @@ export default function eitaxiPage() {
                 <h2 className="text-2xl md:text-3xl font-bold">
                   {searchInfo
                     ? (searchInfo.to
-                      ? `Taxis: ${searchInfo.from} → ${searchInfo.to}`
-                      : `Taxis en ${searchInfo.from}`)
-                    : "Conductores disponibles"}
+                      ? tDrivers('titleRoute', { from: searchInfo.from, to: searchInfo.to })
+                      : tDrivers('titleLocation', { location: searchInfo.from }))
+                    : tDrivers('title')}
                 </h2>
                 <p className="text-gray-500">
-                  {loading ? "Buscando..." : `${drivers.length} conductores encontrados`}
+                  {loading ? tDrivers('searching') : `${drivers.length} ${tDrivers('found')}`}
                   {searchInfo?.tripDistance && (
                     <span className="ml-2 text-yellow-400">
                       · {searchInfo.tripDistance.toFixed(1)} km
@@ -1965,7 +2338,7 @@ export default function eitaxiPage() {
                       });
                   }}
                 >
-                  Ver todos
+                  {tDrivers('viewAll')}
                 </Button>
               )}
             </div>
@@ -1992,6 +2365,15 @@ export default function eitaxiPage() {
                       from: searchInfo.from,
                       to: searchInfo.to
                     } : undefined}
+                    onBook={searchInfo?.tripDistance != null && searchInfo.tripDistance > 0 ? () => {
+                      setBookingDriver(driver);
+                      setShowBooking(true);
+                    } : undefined}
+                    onChat={() => {
+                      setChatDriver({ id: driver.id, name: driver.name });
+                      setShowChat(true);
+                    }}
+                    toggleFavorite={handleToggleFavorite}
                   />
                 ))}
               </div>
@@ -2000,11 +2382,11 @@ export default function eitaxiPage() {
                 <Car className="h-16 w-16 mx-auto text-gray-600 mb-4" />
                 <h3 className="text-xl font-semibold mb-2">
                   {searchInfo
-                    ? `No hay taxis disponibles para esta ruta`
-                    : "No se encontraron conductores"}
+                    ? tDrivers('noDriversRoute')
+                    : tDrivers('noDrivers')}
                 </h3>
                 <p className="text-gray-500 mb-4">
-                  Prueba con otra ubicación o busca en una ciudad cercana más grande
+                  {tDrivers('tryAnother')}
                 </p>
                 <Button
                   variant="outline"
@@ -2017,7 +2399,7 @@ export default function eitaxiPage() {
                       });
                   }}
                 >
-                  Ver todos los taxis disponibles
+                  {tDrivers('viewAll')}
                 </Button>
               </div>
             )}
@@ -2028,14 +2410,14 @@ export default function eitaxiPage() {
         <section className="py-16 bg-gradient-to-br from-yellow-400/10 via-transparent to-yellow-400/5">
           <div className="container mx-auto px-4 text-center">
             <div className="max-w-2xl mx-auto">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">¿Eres conductor en Suiza?</h2>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">{tCta('title')}</h2>
               <p className="text-lg text-gray-400 mb-8">
-                Únete a nuestra plataforma y conecta con miles de pasajeros. Crea tu perfil profesional gratis.
+                {tCta('subtitle')}
               </p>
               <Link href="/registrarse">
                 <Button size="lg" className="bg-yellow-400 text-black hover:bg-yellow-500">
                   <Zap className="mr-2 h-5 w-5" />
-                  Crear mi perfil gratis
+                  {tCta('button')}
                 </Button>
               </Link>
             </div>
@@ -2051,6 +2433,42 @@ export default function eitaxiPage() {
         cantons={cantons}
         onCantonSelect={handleCantonSelect}
       />
+
+      <BookingModal
+        open={showBooking}
+        onClose={() => {
+          setShowBooking(false);
+          setBookingDriver(null);
+        }}
+        driver={bookingDriver ? {
+          id: bookingDriver.id,
+          name: bookingDriver.name,
+          photo: bookingDriver.imageUrl,
+          vehicle: bookingDriver.vehicleType,
+          vehicleBrand: bookingDriver.vehicleBrand,
+          vehicleModel: bookingDriver.vehicleModel,
+          vehicleType: bookingDriver.vehicleType,
+          city: bookingDriver.city,
+          canton: bookingDriver.canton,
+          isAvailable24h: bookingDriver.isAvailable24h,
+          workingHours: bookingDriver.workingHours as any,
+        } : null}
+        origin={searchInfo?.from || ""}
+        destination={searchInfo?.to || ""}
+        stops={currentStops}
+      />
+
+      {chatDriver && (
+        <DirectChatDialog
+          driverId={chatDriver.id}
+          driverName={chatDriver.name}
+          open={showChat}
+          onOpenChange={(open) => {
+            setShowChat(open);
+            if (!open) setChatDriver(null);
+          }}
+        />
+      )}
     </div>
   );
 }

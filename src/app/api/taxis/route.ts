@@ -3,6 +3,15 @@ import { db } from '@/lib/db'
 import { getCached, setCache } from '@/lib/cache'
 import { driverCoversLocation } from '@/lib/geo'
 
+/** Safely parse JSON strings – returns fallback on malformed input */
+function safeJsonParse<T>(value: unknown, fallback: T): T {
+  try {
+    return JSON.parse(value as string) as T
+  } catch {
+    return fallback
+  }
+}
+
 // Cache for 2 minutes
 const CACHE_TTL = 2 * 60 * 1000
 
@@ -21,41 +30,53 @@ export async function GET(request: Request) {
     const service = searchParams.get('service')
     const vehicleType = searchParams.get('vehicleType')
 
-    // Cargar conductores con sus zonas
-    const where: Record<string, unknown> = { isActive: true }
+    // ── Cache: cachear la query base (sin filtros de ubicación) ──
+    const cacheKey = `taxis:${vehicleType || 'all'}:${service || 'all'}`
+    const cached = await getCached<any[]>(cacheKey)
+    let baseDrivers: any[] = cached ? cached.data : null
 
-    if (vehicleType) {
-      where.vehicleType = vehicleType
+    if (!baseDrivers) {
+      const where: Record<string, unknown> = { isActive: true }
+      if (vehicleType) {
+        where.vehicleType = vehicleType
+      }
+
+      const drivers = await db.taxiDriver.findMany({
+        where,
+        include: {
+          city: true,
+          canton: true,
+          driverServiceZones: true,
+          _count: {
+            select: { clientFavorites: true }
+          }
+        },
+        orderBy: [
+          { isTopRated: 'desc' },
+          { subscription: 'desc' },
+          { views: 'desc' },
+        ],
+      })
+
+      baseDrivers = drivers.map(({ password: _pw, resetToken: _rt, resetTokenExpires: _rte, _count, ...driver }) => ({
+        ...driver,
+        _favoriteCount: _count.clientFavorites,
+        services: safeJsonParse(driver.services, []) as string[],
+        routes: safeJsonParse(driver.routes, []) as string[],
+        languages: safeJsonParse(driver.languages, []) as string[],
+        serviceZones: safeJsonParse(driver.serviceZones, []) as string[],
+        driverServiceZones: driver.driverServiceZones.map(z => ({
+          zoneName: z.zoneName,
+          zoneType: z.zoneType,
+          zoneMode: z.zoneMode || 'service',
+          exclusions: safeJsonParse(z.exclusions || '[]', [])
+        }))
+      }))
+
+      await setCache(cacheKey, baseDrivers, CACHE_TTL)
     }
 
-    let drivers = await db.taxiDriver.findMany({
-      where,
-      include: {
-        city: true,
-        canton: true,
-        driverServiceZones: true
-      },
-      orderBy: [
-        { isTopRated: 'desc' },
-        { subscription: 'desc' },
-        { views: 'desc' },
-      ],
-    })
-
-    // Parse JSON fields y convertir zonas
-    let parsedDrivers = drivers.map(driver => ({
-      ...driver,
-      services: JSON.parse(driver.services as string) as string[],
-      routes: JSON.parse(driver.routes as string) as string[],
-      languages: JSON.parse(driver.languages as string) as string[],
-      serviceZones: JSON.parse(driver.serviceZones as string) as string[],
-      driverServiceZones: driver.driverServiceZones.map(z => ({
-        zoneName: z.zoneName,
-        zoneType: z.zoneType,
-        zoneMode: z.zoneMode || 'service',  // 'pickup' o 'service'
-        exclusions: JSON.parse(z.exclusions as string || '[]')
-      }))
-    }))
+    let parsedDrivers = baseDrivers
 
     // =========================================================================
     // NOTA: Sin parámetros de ubicación, mostrar TODOS los taxis

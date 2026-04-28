@@ -33,6 +33,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslations } from 'next-intl';
 
 // Tipos
 export interface TimeSlot {
@@ -138,6 +139,7 @@ export default function ScheduleSelector({
 
   // Errores de validación por día
   const [errors, setErrors] = useState<Record<number, string[]>>({});
+  const t = useTranslations('profile');
 
   // Notificar cambios al padre
   const updateSchedules = (newSchedules: DaySchedule[]) => {
@@ -363,7 +365,7 @@ export default function ScheduleSelector({
             <Sun className="h-5 w-5 text-green-400" />
           </div>
           <div>
-            <p className="font-semibold text-green-400">Disponible 24/7</p>
+            <p className="font-semibold text-green-400">{t('available247')}</p>
             <p className="text-xs text-muted-foreground">
               Activa disponibilidad todos los días, todo el día
             </p>

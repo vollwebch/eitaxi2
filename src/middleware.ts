@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySessionToken, SESSION_COOKIE_NAME } from '@/lib/auth';
+import { verifyClientSessionToken, CLIENT_SESSION_COOKIE } from '@/lib/client-auth';
+import { locales, defaultLocale, localeMap, Locale } from '@/i18n/config';
 
-// Rutas que requieren autenticación de CONDUCTOR
-const PROTECTED_ROUTES = [
+// Rutas que requieren autenticación
+const DRIVER_PROTECTED_ROUTES = [
   '/dashboard/',
   '/gps/',
+  '/gps-quick',
 ];
 
-// Rutas que requieren autenticación de CLIENTE
 const CLIENT_PROTECTED_ROUTES = [
   '/cuenta',
 ];
@@ -15,7 +17,7 @@ const CLIENT_PROTECTED_ROUTES = [
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Permitir rutas de assets, APIs públicas y archivos estáticos
+  // Permitir rutas de assets y APIs públicas
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/api/') ||
@@ -25,75 +27,74 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/restablecer-password') ||
     pathname.startsWith('/widget') ||
     pathname.startsWith('/track/') ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/registrarse') ||
-    pathname.startsWith('/registro') ||
-    pathname.startsWith('/gps-quick') ||
-    pathname.startsWith('/upload') ||
-    pathname.includes('.') // archivos estáticos (img, css, js, etc.)
+    pathname.startsWith('/downloads/') ||
+    pathname.includes('.') // archivos estáticos
   ) {
     return NextResponse.next();
   }
 
-  // Verificar si es una ruta protegida de CONDUCTOR
-  const isDriverProtected = PROTECTED_ROUTES.some(route =>
+  // === LOCALE DETECTION ===
+  // Leer locale de cookie
+  const existingLocale = request.cookies.get('NEXT_LOCALE')?.value;
+  
+  if (!existingLocale || !locales.includes(existingLocale as Locale)) {
+    // Detectar del Accept-Language header
+    const acceptLanguage = request.headers.get('accept-language') || '';
+    const preferredLang = acceptLanguage.split(',')[0]?.split('-')[0]?.trim() || '';
+    const detectedLocale = localeMap[preferredLang] || defaultLocale;
+    
+    // Crear respuesta y setear cookie
+    const response = NextResponse.next();
+    response.cookies.set('NEXT_LOCALE', detectedLocale, {
+      path: '/',
+      maxAge: 365 * 24 * 60 * 60, // 1 año
+      sameSite: 'lax'
+    });
+    
+    // Continuar con auth checks usando esta response
+    return applyAuthChecks(request, response, pathname);
+  }
+
+  // Cookie ya existe, continuar normalmente
+  return applyAuthChecks(request, NextResponse.next(), pathname);
+}
+
+function applyAuthChecks(request: NextRequest, response: NextResponse, pathname: string): NextResponse {
+  // Check driver protected routes
+  const isDriverRoute = DRIVER_PROTECTED_ROUTES.some(route =>
     pathname.startsWith(route)
   );
 
-  if (isDriverProtected) {
+  if (isDriverRoute) {
     const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
-
     if (!sessionToken) {
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
     }
-
-    // Verificar que el token sea válido (JWT firmado)
-    const session = await verifySessionToken(sessionToken);
-    if (!session) {
-      // Token inválido o expirado - limpiar cookie y redirigir
-      const response = NextResponse.redirect(new URL('/login', request.url));
-      response.cookies.delete(SESSION_COOKIE_NAME);
-      return response;
-    }
-
-    // Para /dashboard/[driverId], verificar que el driverId coincide
-    if (pathname.startsWith('/dashboard/')) {
-      const parts = pathname.split('/');
-      const driverIdFromUrl = parts[2]; // /dashboard/[driverId]
-      if (driverIdFromUrl && driverIdFromUrl !== session.driverId) {
-        // Intentar acceder a dashboard de otro conductor - redirigir al propio
-        return NextResponse.redirect(new URL(`/dashboard/${session.driverId}`, request.url));
-      }
-    }
-
-    // Para /gps/[driverId], verificar que el driverId coincide
-    if (pathname.startsWith('/gps/') && pathname.split('/').length >= 3) {
-      const parts = pathname.split('/');
-      const driverIdFromUrl = parts[2];
-      if (driverIdFromUrl && driverIdFromUrl !== session.driverId) {
-        return NextResponse.redirect(new URL(`/gps/${session.driverId}`, request.url));
-      }
-    }
+    return response;
   }
 
-  // Verificar si es una ruta protegida de CLIENTE
-  const isClientProtected = CLIENT_PROTECTED_ROUTES.some(route =>
+  // Check client protected routes
+  const isClientRoute = CLIENT_PROTECTED_ROUTES.some(route =>
     pathname.startsWith(route)
   );
 
-  if (isClientProtected) {
-    // La página /cuenta maneja su propia autenticación internamente
-    // (muestra login/registro si no está autenticado, dashboard si lo está)
-    return NextResponse.next();
+  if (isClientRoute) {
+    const clientToken = request.cookies.get(CLIENT_SESSION_COOKIE)?.value;
+    if (!clientToken) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return response;
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icons/|uploads/|manifest.json|manifest-client.json|sw.js|robots.txt|upload).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icons/|uploads/|manifest.json|sw.js|robots.txt|eitaxi-backup|eitaxi-full-backup).*)',
   ],
 };

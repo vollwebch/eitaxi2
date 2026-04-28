@@ -16,8 +16,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useTranslations } from 'next-intl';
 
 export default function RecuperarPasswordPage() {
+  const t = useTranslations('password');
+  const tCommon = useTranslations('common');
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -40,10 +43,10 @@ export default function RecuperarPasswordPage() {
       if (data.success) {
         setSuccess(true);
       } else {
-        setError(data.error || "Error al procesar la solicitud");
+        setError(data.error || tCommon('error'));
       }
     } catch (err) {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setLoading(false);
     }
@@ -76,23 +79,23 @@ export default function RecuperarPasswordPage() {
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
                   <CheckCircle className="h-8 w-8 text-green-400" />
                 </div>
-                <h1 className="text-xl font-bold mb-2">¡Revisa tu email!</h1>
+                <h1 className="text-xl font-bold mb-2">{t('checkEmail')}</h1>
                 <p className="text-muted-foreground mb-6">
-                  Si existe una cuenta con <strong>{email}</strong>, recibirás un enlace para restablecer tu contraseña.
+                  {t('checkEmailSubtitle', { email })}
                 </p>
                 <Link href="/login">
                   <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
-                    Volver al login
+                    {t('backToLogin')}
                   </Button>
                 </Link>
               </div>
             ) : (
               <>
                 <h1 className="text-2xl font-bold text-center mb-2">
-                  ¿Olvidaste tu contraseña?
+                  {t('forgotTitle')}
                 </h1>
                 <p className="text-muted-foreground text-center mb-6">
-                  Introduce tu email y te enviaremos un enlace para restablecerla
+                  {t('forgotSubtitle')}
                 </p>
 
                 {error && (
@@ -128,10 +131,10 @@ export default function RecuperarPasswordPage() {
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Enviando...
+                        {t('sending')}
                       </>
                     ) : (
-                      "Enviar enlace de recuperación"
+                      t('sendButton')
                     )}
                   </Button>
                 </form>
@@ -144,7 +147,7 @@ export default function RecuperarPasswordPage() {
                 className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver al login
+                {t('backToLogin')}
               </Link>
             </div>
           </CardContent>

@@ -13,38 +13,60 @@ interface SessionGuardProps {
 export function SessionGuard({ children, redirectToDashboard = false }: SessionGuardProps) {
   const router = useRouter();
   const { session, loading } = useSession();
-  const [serverCheckDone, setServerCheckDone] = useState(false);
+  const [serverSessionValid, setServerSessionValid] = useState<boolean | null>(null);
 
   useEffect(() => {
+    // Check driver session
     if (!loading && redirectToDashboard && session) {
-      // Client-side only: verify session via /api/auth/session
-      // If it fails, clear stale localStorage and redirect to /login
       fetch('/api/auth/session')
         .then(res => res.json())
         .then(data => {
-          setServerCheckDone(true);
           if (data.authenticated) {
+            setServerSessionValid(true);
             const driverId = data.data?.driverId || data.session?.driverId;
             router.replace(`/dashboard/${driverId}`);
           } else {
-            // Server session invalid/expired - clear stale localStorage
+            setServerSessionValid(false);
             localStorage.removeItem('eitaxi_session');
             localStorage.removeItem('eitaxi_driver_id');
           }
         })
         .catch(() => {
-          setServerCheckDone(true);
-          // If we can't reach the server, clear stale localStorage
+          setServerSessionValid(false);
           localStorage.removeItem('eitaxi_session');
-          localStorage.removeItem('eitaxi_driver_id');
         });
-    } else if (!loading) {
-      setServerCheckDone(true);
     }
-  }, [loading, session, redirectToDashboard, router]);
 
-  // Show spinner while checking session
-  if (loading || (redirectToDashboard && session && !serverCheckDone)) {
+    // Check client session
+    if (!loading && !session && redirectToDashboard && serverSessionValid === null) {
+      const clientSession = localStorage.getItem('eitaxi_client_session');
+      if (clientSession) {
+        fetch('/api/auth/client/session')
+          .then(res => res.json())
+          .then(data => {
+            if (data.authenticated) {
+              setServerSessionValid(true);
+              router.replace('/cuenta');
+            } else {
+              localStorage.removeItem('eitaxi_client_session');
+              setServerSessionValid(false);
+            }
+          })
+          .catch(() => {
+            localStorage.removeItem('eitaxi_client_session');
+            setServerSessionValid(false);
+          });
+      }
+    }
+
+    // If no session at all, don't show loading spinner
+    if (!loading && !session && !localStorage.getItem('eitaxi_client_session')) {
+      setServerSessionValid(false);
+    }
+  }, [loading, session, redirectToDashboard, router, serverSessionValid]);
+
+  // Show spinner while checking both local and server sessions
+  if (loading || (redirectToDashboard && (session || localStorage.getItem('eitaxi_client_session')) && serverSessionValid === null)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-2 border-yellow-400 border-t-transparent rounded-full"></div>
@@ -59,14 +81,33 @@ export function SessionGuard({ children, redirectToDashboard = false }: SessionG
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { session, loading } = useSession();
+  const [serverValidated, setServerValidated] = useState<boolean | null>(null);
 
   useEffect(() => {
+    if (!loading && session && serverValidated === null) {
+      fetch('/api/auth/session')
+        .then(res => res.json())
+        .then(data => {
+          if (data.authenticated) {
+            setServerValidated(true);
+          } else {
+            setServerValidated(false);
+            localStorage.removeItem('eitaxi_session');
+            localStorage.removeItem('eitaxi_driver_id');
+            router.replace('/login');
+          }
+        })
+        .catch(() => {
+          setServerValidated(false);
+          router.replace('/login');
+        });
+    }
     if (!loading && !session) {
       router.replace('/login');
     }
-  }, [loading, session, router]);
+  }, [loading, session, serverValidated, router]);
 
-  if (loading) {
+  if (loading || serverValidated === null) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin h-8 w-8 border-2 border-yellow-400 border-t-transparent rounded-full"></div>
@@ -74,7 +115,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!session) {
+  if (!session || serverValidated === false) {
     return null;
   }
 

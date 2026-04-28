@@ -1,175 +1,225 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { requireClientAuth } from '@/lib/client-auth'
-import { requireAuth } from '@/lib/auth'
+import { getClientFromRequest } from '@/lib/client-auth'
+import { checkDriverAvailability, type DaySchedule } from '@/lib/schedule-check'
 
-// GET /api/bookings?clientId=xxx OR /api/bookings?driverId=xxx
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const clientId = searchParams.get('clientId')
-    const driverId = searchParams.get('driverId')
-
-    if (clientId) {
-      // Client listing their own bookings
-      const session = await requireClientAuth(request)
-      if (session.clientId !== clientId) {
-        return NextResponse.json(
-          { success: false, error: 'Acceso no autorizado' },
-          { status: 403 }
-        )
-      }
-
-      const bookings = await db.booking.findMany({
-        where: { clientId },
-        include: {
-          client: { select: { id: true, name: true } },
-          driver: { select: { id: true, name: true, imageUrl: true, vehicleType: true } },
-          _count: { select: { messages: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
-
-      return NextResponse.json({ success: true, data: bookings })
-    }
-
-    if (driverId) {
-      // Driver listing their own bookings
-      const session = await requireAuth(request)
-      if (session.driverId !== driverId) {
-        return NextResponse.json(
-          { success: false, error: 'Acceso no autorizado' },
-          { status: 403 }
-        )
-      }
-
-      const bookings = await db.booking.findMany({
-        where: { driverId },
-        include: {
-          client: { select: { id: true, name: true, avatarUrl: true } },
-          driver: { select: { id: true, name: true, imageUrl: true, vehicleType: true } },
-          _count: { select: { messages: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
-
-      return NextResponse.json({ success: true, data: bookings })
-    }
-
-    return NextResponse.json(
-      { success: false, error: 'Se requiere clientId o driverId' },
-      { status: 400 }
-    )
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message === 'No autenticado') {
-      return NextResponse.json(
-        { success: false, error: 'No autenticado' },
-        { status: 401 }
-      )
-    }
-    console.error('Error fetching bookings:', error)
-    return NextResponse.json(
-      { success: false, error: 'Error al obtener reservas' },
-      { status: 500 }
-    )
+function generateReference(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  let result = 'eitaxi-'
+  for (let i = 0; i < 4; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
   }
+  return result
 }
 
-// POST /api/bookings - Create a new booking
+// POST - Crear reserva
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireClientAuth(request)
-
     const body = await request.json()
-    const {
-      driverId,
-      pickupAddress,
-      pickupLat,
-      pickupLon,
-      destAddress,
-      destLat,
-      destLon,
-      scheduledFor,
-      passengerCount,
-      price,
-      notes,
-    } = body
+    const { customerName, customerPhone, pickupAddress, driverId, dropoffAddress, scheduledDate, scheduledTime, notes, passengerCount, estimatedPrice, stops } = body
 
-    // Validate required fields
-    if (!driverId) {
-      return NextResponse.json(
-        { success: false, error: 'El conductor es obligatorio' },
-        { status: 400 }
-      )
+    // Validar campos requeridos
+    if (!customerName || !customerName.trim()) {
+      return NextResponse.json({ success: false, error: 'El nombre es requerido' }, { status: 400 })
+    }
+    if (!customerPhone || !customerPhone.trim()) {
+      return NextResponse.json({ success: false, error: 'El telefono es requerido' }, { status: 400 })
+    }
+    if (!pickupAddress || !pickupAddress.trim()) {
+      return NextResponse.json({ success: false, error: 'La direccion de recogida es requerida' }, { status: 400 })
+    }
+    if (!driverId || !driverId.trim()) {
+      return NextResponse.json({ success: false, error: 'El conductor es requerido' }, { status: 400 })
     }
 
-    if (!pickupAddress || pickupAddress.trim().length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'La dirección de recogida es obligatoria' },
-        { status: 400 }
-      )
-    }
-
-    // Check driver exists
+    // Verificar que el conductor existe
     const driver = await db.taxiDriver.findUnique({
       where: { id: driverId },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        isAvailable24h: true,
+        workingHours: true,
+      },
     })
 
     if (!driver) {
-      return NextResponse.json(
-        { success: false, error: 'Conductor no encontrado' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Conductor no encontrado' }, { status: 404 })
     }
 
-    // Create booking
+    // Validar disponibilidad del conductor por horario
+    const workingHours: DaySchedule[] = driver.workingHours
+      ? (typeof driver.workingHours === 'string'
+          ? JSON.parse(driver.workingHours)
+          : driver.workingHours)
+      : []
+
+    const scheduleCheck = checkDriverAvailability(
+      workingHours,
+      driver.isAvailable24h,
+      scheduledDate || null,
+      scheduledTime || null,
+      'es'
+    )
+
+    if (!scheduleCheck.isAvailable) {
+      let errorMsg = 'El conductor no esta disponible en el horario seleccionado.'
+      if (scheduleCheck.schedule) {
+        errorMsg += ` Horario del conductor: ${scheduleCheck.schedule}`
+      }
+      return NextResponse.json({ success: false, error: errorMsg, unavailable: true }, { status: 400 })
+    }
+
+    // Generar referencia unica
+    let reference = generateReference()
+    const maxAttempts = 10
+    for (let i = 0; i < maxAttempts; i++) {
+      const existing = await db.booking.findUnique({ where: { reference } })
+      if (!existing) break
+      reference = generateReference()
+    }
+
+    // Auto-associate logged-in client (using Request object for reliability)
+    let clientId: string | null = null
+    try {
+      const clientSession = await getClientFromRequest(request)
+      if (clientSession) {
+        clientId = clientSession.clientId
+      }
+    } catch {
+      // No client session - anonymous booking
+    }
+
+    // Crear reserva
     const booking = await db.booking.create({
       data: {
-        clientId: session.clientId,
-        driverId,
-        status: 'pending',
+        reference,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
         pickupAddress: pickupAddress.trim(),
-        pickupLat: pickupLat ?? null,
-        pickupLon: pickupLon ?? null,
-        destAddress: destAddress?.trim() || null,
-        destLat: destLat ?? null,
-        destLon: destLon ?? null,
-        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
-        passengerCount: passengerCount ?? 1,
-        price: price ?? null,
+        dropoffAddress: dropoffAddress?.trim() || null,
+        driverId,
+        scheduledDate: scheduledDate || null,
+        scheduledTime: scheduledTime || null,
         notes: notes?.trim() || null,
-      },
-      include: {
-        client: { select: { id: true, name: true } },
-        driver: { select: { id: true, name: true, imageUrl: true, vehicleType: true } },
-      },
+        passengerCount: passengerCount || 1,
+        estimatedPrice: estimatedPrice || null,
+        status: 'pending',
+        clientId,
+        stops: stops && Array.isArray(stops) && stops.length > 0 ? {
+          create: stops.map((stop: any, index: number) => ({
+            stopOrder: index + 1,
+            address: typeof stop === 'string' ? stop : (stop.address || stop.text || ''),
+            latitude: stop.latitude || stop.lat || null,
+            longitude: stop.longitude || stop.lon || null,
+          })),
+        } : undefined,
+      }
     })
 
-    // Create notification for the client
-    await db.notification.create({
+    // Notificar al cliente si está logueado
+    if (clientId) {
+      const driverInfo = await db.taxiDriver.findUnique({
+        where: { id: driverId },
+        select: { name: true },
+      });
+      const driverName = driverInfo?.name || 'Tu conductor';
+      await db.clientNotification.create({
+        data: {
+          clientId,
+          type: 'booking_status',
+          title: 'Reserva creada',
+          message: `Tu reserva ${reference} con ${driverName} ha sido creada. Esperando confirmación.`,
+          link: `/cuenta?tab=reservas&booking=${booking.id}`,
+          bookingId: booking.id,
+        },
+      });
+    }
+
+    // Notificar al conductor de la nueva reserva
+    const pickupShort = pickupAddress.trim().length > 40 ? pickupAddress.trim().substring(0, 40) + '...' : pickupAddress.trim();
+    const scheduledInfo = (scheduledDate || scheduledTime) ? ` (${scheduledDate} ${scheduledTime || ''})`.trim() : '';
+    await db.driverNotification.create({
       data: {
-        clientId: session.clientId,
-        title: 'Reserva creada',
-        body: `Tu reserva con ${driver.name} ha sido creada exitosamente. Estado: Pendiente.`,
-        type: 'booking_created',
-        link: `/bookings/${booking.id}`,
-        metadata: JSON.stringify({ bookingId: booking.id, driverId, driverName: driver.name }),
+        driverId,
+        type: 'new_booking',
+        title: 'Nueva reserva',
+        message: `${customerName.trim()} ha reservado un taxi desde ${pickupShort}${scheduledInfo}.`,
+        link: `/dashboard/${driverId}?tab=bookings&booking=${booking.id}`,
+        bookingId: booking.id,
       },
-    })
+    });
 
     return NextResponse.json({ success: true, data: booking })
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message === 'No autenticado') {
-      return NextResponse.json(
-        { success: false, error: 'No autenticado' },
-        { status: 401 }
-      )
+  } catch (error) {
+    console.error('Create booking error:', error)
+    return NextResponse.json({ success: false, error: 'Error al crear la reserva' }, { status: 500 })
+  }
+}
+
+// GET - Listar reservas
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const driverId = searchParams.get('driverId')
+    const reference = searchParams.get('reference')
+
+    if (reference) {
+      // Buscar reserva especifica por referencia
+      const normalizedRef = reference.trim()
+      const booking = await db.booking.findFirst({
+        where: { reference: normalizedRef },
+        include: {
+          driver: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              whatsapp: true,
+              imageUrl: true,
+            }
+          },
+          stops: {
+            orderBy: { stopOrder: 'asc' },
+          }
+        }
+      })
+
+      if (!booking) {
+        return NextResponse.json({ success: false, error: 'Reserva no encontrada' }, { status: 404 })
+      }
+
+      return NextResponse.json({ success: true, data: booking })
     }
-    console.error('Error creating booking:', error)
+
+    if (driverId) {
+      // Listar reservas de un conductor (excluir papelera)
+      const bookings = await db.booking.findMany({
+        where: { driverId, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          driver: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+            }
+          },
+          stops: {
+            orderBy: { stopOrder: 'asc' },
+          }
+        }
+      })
+
+      return NextResponse.json({ success: true, data: bookings })
+    }
+
+    // Sin parametros: devolver error
     return NextResponse.json(
-      { success: false, error: 'Error al crear la reserva' },
-      { status: 500 }
+      { success: false, error: 'Se requiere driverId o reference' },
+      { status: 400 }
     )
+  } catch (error) {
+    console.error('Get bookings error:', error)
+    return NextResponse.json({ success: false, error: 'Error al obtener reservas' }, { status: 500 })
   }
 }

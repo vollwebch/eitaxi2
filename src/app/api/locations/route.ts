@@ -190,7 +190,7 @@ async function searchPhoton(query: string, locationBias?: LocationBias): Promise
     }
     
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(8000),
       headers: { 'Accept': 'application/json' }
     })
     
@@ -355,7 +355,7 @@ async function searchNominatim(query: string, locationBias?: LocationBias): Prom
     let url: string
     
     // Base de parámetros comunes
-    const commonParams = `countrycodes=ch,li&viewbox=${viewbox}&bounded=1&format=json&limit=8&addressdetails=1&accept-language=es`
+    const commonParams = `countrycodes=ch,li&viewbox=${viewbox}&bounded=1&format=json&limit=15&addressdetails=1&accept-language=es`
     
     if (addressMatch && addressMatch[1].length > 3) {
       // Búsqueda estructurada para direcciones con número
@@ -526,6 +526,8 @@ async function searchNominatim(query: string, locationBias?: LocationBias): Prom
 // ============================================
 // API ROUTE PRINCIPAL
 // ============================================
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -637,17 +639,21 @@ export async function GET(request: NextRequest) {
     const allSearchTerms = [...new Set([...finalSearchTerms, ...expandedQueries])]
     
     // Buscando direcciones
-    // Expandir búsqueda con variantes si es necesario
+    // Photon (~5s) y Nominatim (~300ms) en paralelo
+    // La primera búsqueda tarda ~5s, pero cachea para las siguientes (13ms)
     
-    // Buscar en ambas APIs con todas las variantes
     const searchPromises: Promise<SearchResult>[] = []
     
+    // Photon: siempre buscar (caché o red)
+    searchPromises.push(searchPhoton(searchTerm, locationBias))
+    
+    // Nominatim: con todas las variantes de traducción
     for (const searchVariant of allSearchTerms) {
-      searchPromises.push(searchPhoton(searchVariant, locationBias))
       searchPromises.push(searchNominatim(searchVariant, locationBias))
     }
     
-    const allSearchResults = await Promise.all(searchPromises)
+    const allSearchResults = await Promise.allSettled(searchPromises)
+      .then(results => results.map(r => r.status === 'fulfilled' ? r.value : { results: [], fromCache: false }))
     
     // Verificar si algún resultado viene del caché
     const anyFromCache = allSearchResults.some(r => r.fromCache)

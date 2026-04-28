@@ -101,6 +101,8 @@ interface DriverForSearch {
     destination: string;
     isActive: boolean;
   }>;
+  _legacyRoutes?: string[];  // Legacy routes from driver.routes JSON field (e.g. ["vaduz-buchs", "zurich-airport"])
+  _favoriteCount?: number;
   basePrice?: number | null;
   pricePerKm?: number | null;
   hourlyRate?: number | null;
@@ -119,6 +121,7 @@ interface DriverForSearch {
   isTopRated?: boolean;
   isAvailable24h?: boolean;
   subscription?: string;
+  workingHours?: Array<{ dayOfWeek: number; mode: string; slots: Array<{ startTime: string; endTime: string }> }>;
 }
 
 interface MatchPriority {
@@ -147,6 +150,7 @@ interface SearchResult {
   zones: { pickup: string; service: string };
   isReturnTrip?: boolean;
   routeBypass?: boolean;
+  directionType?: 'roundTrip' | 'oneWay';
 }
 
 interface SearchMeta {
@@ -272,7 +276,12 @@ function normalizeText(text: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    // Remove parenthetical canton codes like (SG), (ZH), etc.
+    .replace(/\([^)]*\)/g, '')
+    // Remove postal codes (4 digits)
+    .replace(/\b\d{4}\b/g, '')
     .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -296,9 +305,24 @@ function isCityInCanton(cityName: string, cantonCode: string): boolean {
 }
 
 /**
- * Verificar si una ciudad pertenece a un distrito específico
+ * Verificar si una ciudad pertenece a un cantón, validando también con código postal
+ * Evita falsos positivos como "Buchs AG" coincidiendo con municipios de SG
  */
-function isCityInDistrict(cityName: string, cantonCode: string, districtName: string): boolean {
+function isCityInCantonStrict(cityName: string, cantonCode: string, locationCantonCode?: string, locationPostalCode?: string): boolean {
+  // Si la ubicación tiene cantón y no coincide con el cantón buscado, descartar
+  if (locationCantonCode) {
+    if (locationCantonCode.toUpperCase() !== cantonCode.toUpperCase()) {
+      return false;
+    }
+  }
+  return isCityInCanton(cityName, cantonCode);
+}
+
+/**
+ * Verificar si una ciudad pertenece a un distrito específico
+ * Añade validación estricta: el cantón de la ubicación debe coincidir con el cantón del distrito
+ */
+function isCityInDistrict(cityName: string, cantonCode: string, districtName: string, locationCantonCode?: string): boolean {
   const districts = DISTRICTS_BY_CANTON[cantonCode.toUpperCase()];
   if (!districts) return false;
   
@@ -310,7 +334,18 @@ function isCityInDistrict(cityName: string, cantonCode: string, districtName: st
   if (!district) return false;
   
   const normalizedCity = normalizeText(cityName);
-  return district.municipalities.some(m => normalizeText(m) === normalizedCity);
+  const nameMatch = district.municipalities.some(m => normalizeText(m) === normalizedCity);
+  
+  if (!nameMatch) return false;
+  
+  // Validación estricta: si la ubicación tiene cantón, debe coincidir con el distrito
+  if (locationCantonCode) {
+    if (locationCantonCode.toUpperCase() !== cantonCode.toUpperCase()) {
+      return false;
+    }
+  }
+  
+  return true;
 }
 
 /**
@@ -383,9 +418,17 @@ function checkZoneCoverage(
         return { covered: true, reason: `Cantón: ${zone.zoneName}` };
       }
       
-      // Verificar si la ciudad pertenece al cantón de la zona
-      if (zoneCantonCode && isCityInCanton(location.city, zoneCantonCode)) {
-        return { covered: true, reason: `Cantón: ${zone.zoneName}` };
+      // Verificar si la ciudad pertenece al cantón de la zona (SOLO si no hay cantón en la ubicación)
+      // Esto evita que "Buchs AG" coincida con cantón SG solo porque existe "Buchs" en SG
+      if (zoneCantonCode && !location.cantonCode) {
+        if (isCityInCanton(location.city, zoneCantonCode)) {
+          return { covered: true, reason: `Cantón: ${zone.zoneName}` };
+        }
+      } else if (zoneCantonCode && location.cantonCode) {
+        // Con cantón conocido, usar validación estricta
+        if (isCityInCantonStrict(location.city, zoneCantonCode, location.cantonCode)) {
+          return { covered: true, reason: `Cantón: ${zone.zoneName}` };
+        }
       }
       break;
       
@@ -396,18 +439,66 @@ function checkZoneCoverage(
       const districtCantonCode = districtCantonMatch ? districtCantonMatch[1] : null;
       const districtName = zone.zoneName.replace(/\s*[A-Z]{2}\s*$/, '').trim();
       
-      if (districtCantonCode && isCityInDistrict(location.city, districtCantonCode, districtName)) {
-        return { covered: true, reason: `Distrito: ${zone.zoneName}` };
+      if (districtCantonCode) {
+        // Canton code found in zone name — search specific canton
+        // Con validación estricta: el cantón de la ubicación debe coincidir
+        if (isCityInDistrict(location.city, districtCantonCode, districtName, location.cantonCode)) {
+          return { covered: true, reason: `Distrito: ${zone.zoneName}` };
+        }
+      } else {
+        // No canton code in zone name (e.g. "Werdenberg") — search ALL cantons
+        // PERO: si la ubicación tiene cantón conocido, solo aceptar distritos de ese cantón
+        for (const cc of Object.keys(DISTRICTS_BY_CANTON)) {
+          // Si la ubicación tiene cantón, solo buscar en ese cantón
+          if (location.cantonCode && cc.toUpperCase() !== location.cantonCode.toUpperCase()) {
+            continue;
+          }
+          if (isCityInDistrict(location.city, cc, districtName, location.cantonCode)) {
+            return { covered: true, reason: `Distrito: ${zone.zoneName}` };
+          }
+        }
       }
       break;
       
     case 'municipality':
-    case 'city':
+    case 'city': {
       // Solo esa ciudad específica
-      if (cityNorm === zoneNameNorm || cityNorm.includes(zoneNameNorm) || zoneNameNorm.includes(cityNorm)) {
+      const cityNameMatch = cityNorm === zoneNameNorm || cityNorm.includes(zoneNameNorm) || zoneNameNorm.includes(cityNorm);
+      
+      if (cityNameMatch) {
+        // Desambiguación por cantón: si la zona tiene código de cantón (ej: "Buchs SG"),
+        // verificar que coincide con el cantón de la ubicación
+        const zoneCantonCodeMatch = zone.zoneName.match(/\b([A-Z]{2})\b$/);
+        const extractedZoneCanton = zoneCantonCodeMatch ? zoneCantonCodeMatch[1] : null;
+        
+        if (extractedZoneCanton && location.cantonCode) {
+          if (extractedZoneCanton.toUpperCase() !== location.cantonCode.toUpperCase()) {
+            break; // Distinto cantón → no es la misma ciudad
+          }
+        }
+        
+        // Desambiguación por código postal: si la ubicación tiene código postal,
+        // verificar que coincide con el rango esperado para el cantón de la zona
+        if (location.postalCode && location.cantonCode && extractedZoneCanton) {
+          // Verificación adicional por código postal para evitar falsos positivos
+          // ej: Buchs AG (5038) no debe coincidir con zona "Buchs SG" (9470)
+          const postalPrefix = location.postalCode.substring(0, 2);
+          const cantonPostalCodes: Record<string, string[]> = {
+            'AG': ['50', '51', '52', '53', '54', '55', '56'],
+            'SG': ['73', '82', '83', '84', '88', '90', '91', '93', '94', '95', '96'],
+            'ZH': ['80', '81', '82', '83', '84', '85', '86', '87', '88', '89'],
+            'BE': ['30', '31', '32', '33', '34', '35', '36', '37', '38', '39'],
+          };
+          const expectedPrefixes = cantonPostalCodes[extractedZoneCanton.toUpperCase()];
+          if (expectedPrefixes && !expectedPrefixes.includes(postalPrefix)) {
+            break; // Código postal no corresponde al cantón esperado
+          }
+        }
+        
         return { covered: true, reason: `${zone.zoneType}: ${zone.zoneName}` };
       }
       break;
+    }
   }
   
   return { covered: false, reason: '' };
@@ -415,38 +506,66 @@ function checkZoneCoverage(
 
 /**
  * Verificar si el conductor tiene una ruta popular que coincide
+ * Checks both DriverRoute table entries AND legacy JSON routes field
  */
 function checkPopularRouteBypass(
   driver: DriverForSearch,
   originText: string,
   destText: string
 ): { bypass: boolean; route?: string } {
-  if (!driver.driverRoutes || driver.driverRoutes.length === 0) {
-    return { bypass: false };
-  }
-  
   const originNorm = normalizeText(originText);
   const destNorm = normalizeText(destText);
-  
-  for (const route of driver.driverRoutes) {
-    if (!route.isActive) continue;
-    
-    const routeOriginNorm = normalizeText(route.origin);
-    const routeDestNorm = normalizeText(route.destination);
-    
-    // Coincidencia exacta o contenido
-    const originMatch = routeOriginNorm === originNorm || 
-                        routeOriginNorm.includes(originNorm) ||
-                        originNorm.includes(routeOriginNorm);
-    const destMatch = routeDestNorm === destNorm ||
-                      routeDestNorm.includes(destNorm) ||
-                      destNorm.includes(routeDestNorm);
-    
-    if (originMatch && destMatch) {
-      return { 
-        bypass: true, 
-        route: `${route.origin} → ${route.destination}` 
-      };
+
+  // Check DriverRoute table entries
+  if (driver.driverRoutes && driver.driverRoutes.length > 0) {
+    for (const route of driver.driverRoutes) {
+      if (!route.isActive) continue;
+      
+      const routeOriginNorm = normalizeText(route.origin);
+      const routeDestNorm = normalizeText(route.destination);
+      
+      const originMatch = routeOriginNorm === originNorm || 
+                          routeOriginNorm.includes(originNorm) ||
+                          originNorm.includes(routeOriginNorm);
+      const destMatch = routeDestNorm === destNorm ||
+                        routeDestNorm.includes(destNorm) ||
+                        destNorm.includes(routeDestNorm);
+      
+      if (originMatch && destMatch) {
+        return { 
+          bypass: true, 
+          route: `${route.origin} → ${route.destination}` 
+        };
+      }
+    }
+  }
+
+  // Check legacy JSON routes (slugs like "vaduz-buchs", "zurich-airport")
+  if (driver._legacyRoutes && driver._legacyRoutes.length > 0) {
+    for (const routeSlug of driver._legacyRoutes) {
+      if (!routeSlug || typeof routeSlug !== 'string') continue;
+      
+      const parts = routeSlug.split('-');
+      if (parts.length < 2) continue;
+      
+      // Handle route slugs: "vaduz-buchs" → origin="vaduz", dest="buchs"
+      // Multi-part names: "zurich-airport" → origin="zurich", dest="airport"
+      const routeOriginNorm = normalizeText(parts[0]);
+      const routeDestNorm = normalizeText(parts.slice(1).join('-'));
+      
+      const originMatch = routeOriginNorm === originNorm || 
+                          routeOriginNorm.includes(originNorm) ||
+                          originNorm.includes(routeOriginNorm);
+      const destMatch = routeDestNorm === destNorm ||
+                        routeDestNorm.includes(destNorm) ||
+                        destNorm.includes(routeDestNorm);
+      
+      if (originMatch && destMatch) {
+        return { 
+          bypass: true, 
+          route: routeSlug 
+        };
+      }
     }
   }
   
@@ -477,14 +596,60 @@ function isGPSLocationFresh(driver: DriverForSearch): boolean {
  */
 function estimatePrice(
   distanceKm: number,
-  basePrice: number = 5,
-  pricePerKm: number = 2.5
+  basePrice: number = 8,
+  pricePerKm: number = 3.2
 ): { min: number; max: number } {
   const calculated = basePrice + (distanceKm * pricePerKm);
   return {
     min: Math.round(calculated),
     max: Math.round(calculated * 1.15)
   };
+}
+
+/**
+ * Verificar si el conductor cubre la ruta en ambos sentidos
+ * Comprueba si el conductor también haría el viaje inverso (destination → origin)
+ * IMPORTANTE: Respeta las exclusiones - no hace fallback entre pickup/service si hay zonas definidas
+ */
+function checkDirectionType(
+  origin: SearchLocation,
+  destination: SearchLocation,
+  driver: DriverForSearch
+): 'roundTrip' | 'oneWay' {
+  const allZones = driver.driverServiceZones;
+  const pickupZones = allZones.filter(z => z.zoneMode === 'pickup');
+  const serviceZones = allZones.filter(z => z.zoneMode === 'service');
+
+  // Para el viaje de vuelta (destination → origin):
+  // - destination debe estar en zonas pickup (como punto de recogida)
+  // - origin debe estar en zonas service (como punto de destino)
+  // Solo se hace fallback al otro tipo de zona si NO hay zonas del tipo principal
+
+  // Verificar pickup inverso: destination como punto de recogida
+  let reversePickupOk = false;
+  for (const zone of pickupZones) {
+    if (checkZoneCoverage(destination, zone).covered) { reversePickupOk = true; break; }
+  }
+  // Solo si NO hay pickup zones, intentar con service zones
+  if (!reversePickupOk && pickupZones.length === 0) {
+    for (const zone of serviceZones) {
+      if (checkZoneCoverage(destination, zone).covered) { reversePickupOk = true; break; }
+    }
+  }
+
+  // Verificar destino inverso: origin como punto de destino
+  let reverseDestOk = false;
+  for (const zone of serviceZones) {
+    if (checkZoneCoverage(origin, zone).covered) { reverseDestOk = true; break; }
+  }
+  // Solo si NO hay service zones, intentar con pickup zones
+  if (!reverseDestOk && serviceZones.length === 0) {
+    for (const zone of pickupZones) {
+      if (checkZoneCoverage(origin, zone).covered) { reverseDestOk = true; break; }
+    }
+  }
+
+  return (reversePickupOk && reverseDestOk) ? 'roundTrip' : 'oneWay';
 }
 
 // =========================================================================
@@ -494,6 +659,9 @@ function estimatePrice(
 /**
  * REGLA 1: Validación de RECOGIDA (Origen)
  * El Punto A debe coincidir con zonas pickup, si no, GPS activo cerca
+ * IMPORTANTE: Si el conductor tiene zonas pickup definidas, SOLO se usan esas.
+ * El fallback a service zones solo aplica si NO hay pickup zones.
+ * Esto garantiza que las exclusiones de pickup se respeten siempre.
  */
 async function validatePickup(
   origin: SearchLocation,
@@ -510,11 +678,14 @@ async function validatePickup(
     }
   }
   
-  // También verificar zonas de servicio (para compatibilidad)
-  for (const zone of serviceZones) {
-    const result = checkZoneCoverage(origin, zone);
-    if (result.covered) {
-      return { valid: true, reason: `En zona de servicio: ${zone.zoneName}` };
+  // SOLO si NO hay zonas pickup definidas, usar service zones como pickup
+  // Esto evita que las exclusiones de pickup se bypassen con service zones
+  if (pickupZones.length === 0) {
+    for (const zone of serviceZones) {
+      const result = checkZoneCoverage(origin, zone);
+      if (result.covered) {
+        return { valid: true, reason: `En zona de servicio: ${zone.zoneName}` };
+      }
     }
   }
   
@@ -560,6 +731,9 @@ async function validatePickup(
 /**
  * REGLA 2: Validación de DESTINO
  * El Punto B debe coincidir con zonas service
+ * IMPORTANTE: Si el conductor tiene zonas service definidas, SOLO se usan esas.
+ * El fallback a pickup zones solo aplica si NO hay service zones.
+ * Esto garantiza que las exclusiones de service se respeten siempre.
  */
 function validateDestination(
   destination: SearchLocation,
@@ -575,12 +749,15 @@ function validateDestination(
     }
   }
   
-  // También verificar zonas de pickup (algunos conductores las usan como ambas)
-  const pickupZones = driver.driverServiceZones.filter(z => z.zoneMode === 'pickup');
-  for (const zone of pickupZones) {
-    const result = checkZoneCoverage(destination, zone);
-    if (result.covered) {
-      return { valid: true, reason: `En zona de pickup: ${zone.zoneName}` };
+  // SOLO si NO hay zonas service definidas, usar pickup zones como destino
+  // Esto evita que las exclusiones de service se bypassen con pickup zones
+  if (serviceZones.length === 0) {
+    const pickupZones = driver.driverServiceZones.filter(z => z.zoneMode === 'pickup');
+    for (const zone of pickupZones) {
+      const result = checkZoneCoverage(destination, zone);
+      if (result.covered) {
+        return { valid: true, reason: `En zona de pickup: ${zone.zoneName}` };
+      }
     }
   }
   
@@ -767,6 +944,9 @@ async function getDriversWithLocation(): Promise<DriverForSearch[]> {
       locations: {
         orderBy: { createdAt: 'desc' },
         take: 1
+      },
+      _count: {
+        select: { clientFavorites: true }
       }
     }
   });
@@ -803,10 +983,26 @@ async function getDriversWithLocation(): Promise<DriverForSearch[]> {
     let services: string[] = [];
     let languages: string[] = [];
     let vehicleTypes: string[] = [];
+    let legacyRoutes: string[] = [];
+    let workingHours: DriverForSearch['workingHours'] = undefined;
 
     try { services = JSON.parse(d.services || '[]'); } catch {}
     try { languages = JSON.parse(d.languages || '[]'); } catch {}
     try { vehicleTypes = JSON.parse(d.vehicleTypes || '["taxi"]'); } catch {}
+    try { legacyRoutes = JSON.parse(d.routes || '[]'); } catch {}
+    try {
+      const parsedWH = JSON.parse(d.workingHours || 'null');
+      if (Array.isArray(parsedWH) && parsedWH.length > 0) {
+        workingHours = parsedWH.map((s: any) => ({
+          dayOfWeek: s.dayOfWeek,
+          mode: s.mode,
+          slots: Array.isArray(s.slots) ? s.slots.map((sl: any) => ({
+            startTime: sl.startTime,
+            endTime: sl.endTime,
+          })) : [],
+        }));
+      }
+    } catch {}
 
     return {
       id: d.id,
@@ -816,6 +1012,7 @@ async function getDriversWithLocation(): Promise<DriverForSearch[]> {
       whatsapp: d.whatsapp,
       city: d.city,
       canton: d.canton,
+      _favoriteCount: d._count.clientFavorites,
       latitude: d.latitude,
       longitude: d.longitude,
       operationRadius: d.operationRadius,
@@ -833,6 +1030,7 @@ async function getDriversWithLocation(): Promise<DriverForSearch[]> {
         destination: r.destination,
         isActive: r.isActive
       })),
+      _legacyRoutes: legacyRoutes,
       basePrice: d.basePrice,
       pricePerKm: d.pricePerKm,
       hourlyRate: d.hourlyRate,
@@ -850,7 +1048,8 @@ async function getDriversWithLocation(): Promise<DriverForSearch[]> {
       isVerified: d.isVerified,
       isTopRated: d.isTopRated,
       isAvailable24h: d.isAvailable24h,
-      subscription: d.subscription
+      subscription: d.subscription,
+      workingHours,
     };
   });
 
@@ -1069,48 +1268,10 @@ export async function GET(request: NextRequest) {
         if (!driver.isActive) continue;
 
         // ================================================================
-        // PASO 0: Verificar exclusión (VETO)
+        // NOTA: Las exclusiones se verifican DENTRO de checkZoneCoverage()
+        // para cada zona específica. No se aplican como veto global porque
+        // una exclusión en zona pickup no debe afectar la validación de destino.
         // ================================================================
-        let excluded = false;
-        
-        if (origin) {
-          const originExclusion = isLocationInExclusions(
-            {
-              city: origin.city,
-              canton: origin.canton,
-              cantonCode: origin.cantonCode,
-              postalCode: origin.postalCode,
-              displayName: origin.displayName
-            },
-            driver.driverServiceZones.flatMap(z => z.exclusions || [])
-          );
-          if (originExclusion.vetoed) {
-            console.log(`🚫 ${driver.name}: VETADO - Origen en zona excluida: ${originExclusion.reason}`);
-            excluded = true;
-          }
-        }
-
-        if (destination && !excluded) {
-          const destExclusion = isLocationInExclusions(
-            {
-              city: destination.city,
-              canton: destination.canton,
-              cantonCode: destination.cantonCode,
-              postalCode: destination.postalCode,
-              displayName: destination.displayName
-            },
-            driver.driverServiceZones.flatMap(z => z.exclusions || [])
-          );
-          if (destExclusion.vetoed) {
-            console.log(`🚫 ${driver.name}: VETADO - Destino en zona excluida: ${destExclusion.reason}`);
-            excluded = true;
-          }
-        }
-
-        if (excluded) {
-          meta.filteredByZones++;
-          continue;
-        }
 
         // ================================================================
         // PASO 1: Verificar filtros de vehículo (REGLA 8)
@@ -1160,13 +1321,14 @@ export async function GET(request: NextRequest) {
               distanceToOrigin,
               tripDistance,
               tripDuration,
-              estimatedPrice: estimatePrice(tripDistance, driver.basePrice || 5, driver.pricePerKm || 2.5),
+              estimatedPrice: estimatePrice(tripDistance, driver.basePrice ?? 8, driver.pricePerKm ?? 3.2),
               matchReason: `Ruta popular: ${routeBypass.route}`,
               zones: {
                 pickup: driver.driverServiceZones.filter(z => z.zoneMode === 'pickup').map(z => z.zoneName).join(', '),
                 service: driver.driverServiceZones.filter(z => z.zoneMode === 'service').map(z => z.zoneName).join(', ')
               },
-              routeBypass: true
+              routeBypass: true,
+              directionType: checkDirectionType(origin, destination, driver)
             });
             continue;
           }
@@ -1253,7 +1415,7 @@ export async function GET(request: NextRequest) {
               distanceToOrigin: pickupDistance,
               tripDistance,
               tripDuration,
-              estimatedPrice: estimatePrice(tripDistance, driver.basePrice || 5, driver.pricePerKm || 2.5),
+              estimatedPrice: estimatePrice(tripDistance, driver.basePrice ?? 8, driver.pricePerKm ?? 3.2),
               matchReason: returnCheck.isReturn 
                 ? `${pickupReason} → ${destReason} (${returnCheck.reason})`
                 : `${pickupReason} → ${destReason}`,
@@ -1261,7 +1423,8 @@ export async function GET(request: NextRequest) {
                 pickup: driver.driverServiceZones.filter(z => z.zoneMode === 'pickup').map(z => z.zoneName).join(', '),
                 service: driver.driverServiceZones.filter(z => z.zoneMode === 'service').map(z => z.zoneName).join(', ')
               },
-              isReturnTrip: returnCheck.isReturn
+              isReturnTrip: returnCheck.isReturn,
+              directionType: checkDirectionType(origin, destination, driver)
             });
             console.log(`✅ ${driver.name}: ${priority.label} - ${pickupReason} → ${destReason}`);
           } else if (pickupValid && !destValid) {
@@ -1274,12 +1437,13 @@ export async function GET(request: NextRequest) {
                 distanceToOrigin: pickupDistance,
                 tripDistance,
                 tripDuration,
-                estimatedPrice: estimatePrice(tripDistance, driver.basePrice || 5, driver.pricePerKm || 2.5),
+                estimatedPrice: estimatePrice(tripDistance, driver.basePrice ?? 8, driver.pricePerKm ?? 3.2),
                 matchReason: `${pickupReason} (destino fuera de zona)`,
                 zones: {
                   pickup: driver.driverServiceZones.filter(z => z.zoneMode === 'pickup').map(z => z.zoneName).join(', '),
                   service: driver.driverServiceZones.filter(z => z.zoneMode === 'service').map(z => z.zoneName).join(', ')
-                }
+                },
+                directionType: 'oneWay'
               });
               console.log(`⚠️ ${driver.name}: MATCH PARCIAL - ${pickupReason} (destino no cubierto)`);
             }
@@ -1293,13 +1457,14 @@ export async function GET(request: NextRequest) {
                 distanceToOrigin: pickupDistance,
                 tripDistance,
                 tripDuration,
-                estimatedPrice: estimatePrice(tripDistance, driver.basePrice || 5, driver.pricePerKm || 2.5),
+                estimatedPrice: estimatePrice(tripDistance, driver.basePrice ?? 8, driver.pricePerKm ?? 3.2),
                 matchReason: `${returnCheck.reason} - ${destReason}`,
                 zones: {
                   pickup: driver.driverServiceZones.filter(z => z.zoneMode === 'pickup').map(z => z.zoneName).join(', '),
                   service: driver.driverServiceZones.filter(z => z.zoneMode === 'service').map(z => z.zoneName).join(', ')
                 },
-                isReturnTrip: true
+                isReturnTrip: true,
+                directionType: 'oneWay'
               });
               console.log(`🔄 ${driver.name}: RETURN MATCH - ${returnCheck.reason}`);
             }
@@ -1342,6 +1507,7 @@ export async function GET(request: NextRequest) {
         zones: r.zones,
         isReturnTrip: r.isReturnTrip,
         routeBypass: r.routeBypass,
+        directionType: r.directionType,
         vehicle: {
           type: r.driver.vehicleType,
           types: r.driver.vehicleTypes,
@@ -1356,7 +1522,10 @@ export async function GET(request: NextRequest) {
         isTopRated: r.driver.isTopRated,
         isAvailable24h: r.driver.isAvailable24h,
         imageUrl: r.driver.imageUrl,
-        description: r.driver.description
+        description: r.driver.description,
+        basePrice: r.driver.basePrice,
+        pricePerKm: r.driver.pricePerKm,
+        _favoriteCount: r.driver._favoriteCount || 0
       }));
 
       const elapsed = Date.now() - startTime;
@@ -1465,15 +1634,12 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: results.map(r => {
-          const { phone, whatsapp, ...driverWithoutContact } = r.driver;
-          return {
-            ...driverWithoutContact,
-            priority: r.priority.level,
-            priorityLabel: r.priority.label,
-            matchReason: r.matchReason
-          };
-        }),
+        data: results.map(r => ({
+          ...r.driver,
+          priority: r.priority.level,
+          priorityLabel: r.priority.label,
+          matchReason: r.matchReason
+        })),
         total: results.length
       });
     }
@@ -1552,15 +1718,12 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        data: matchResults.map(r => {
-          const { phone, whatsapp, ...driverWithoutContact } = r.driver;
-          return {
-            ...driverWithoutContact,
-            priority: r.priority.level,
-            priorityLabel: r.priority.label,
-            matchReason: r.matchReason
-          };
-        }),
+        data: matchResults.map(r => ({
+          ...r.driver,
+          priority: r.priority.level,
+          priorityLabel: r.priority.label,
+          matchReason: r.matchReason
+        })),
         total: matchResults.length,
         query,
         resolvedLocation: location.displayName
@@ -1571,15 +1734,10 @@ export async function GET(request: NextRequest) {
     // SIN PARÁMETROS: RETORNAR TODOS LOS CONDUCTORES
     // =========================================================================
     const allDrivers = await getDriversWithLocation();
-    // 🔒 Ocultar phone y whatsapp de la respuesta (nDSG)
-    const sanitizedDrivers = allDrivers.map(d => {
-      const { phone, whatsapp, ...driverWithoutContact } = d;
-      return driverWithoutContact;
-    });
     return NextResponse.json({
       success: true,
-      data: sanitizedDrivers,
-      total: sanitizedDrivers.length
+      data: allDrivers,
+      total: allDrivers.length
     });
 
   } catch (error) {

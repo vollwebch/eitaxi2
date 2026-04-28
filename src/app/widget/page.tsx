@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Navigation, Power, X, Bell, Loader2, MapPin, Shield, Eye, EyeOff, Download, Smartphone, Share2, Plus, Check, LogIn, Car, ArrowRight, Key } from "lucide-react";
+import Link from "next/link";
+import { Navigation, Power, X, Bell, Loader2, MapPin, Shield, Eye, EyeOff, Download, Smartphone, Share2, Plus, Check, LogIn, Car, ArrowRight } from "lucide-react";
 import {
   subscribeToGPS,
   broadcastGPSState,
   readFromStorage,
   type GPSState
 } from "@/lib/gpsSync";
+import { useTranslations } from 'next-intl';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -25,6 +27,7 @@ export default function WidgetPage() {
   const [driverName, setDriverName] = useState<string | null>(null);
   const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const t = useTranslations();
 
   // GPS Consent
   const [showGpsConsent, setShowGpsConsent] = useState(false);
@@ -61,10 +64,7 @@ export default function WidgetPage() {
     };
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Check session via API, fallback to localStorage, fallback to URL params
-    const urlParams = new URLSearchParams(window.location.search);
-    let foundId = urlParams.get('driverId');
-
+    // Check session via API
     fetch('/api/auth/session')
       .then(res => res.json())
       .then(data => {
@@ -73,59 +73,10 @@ export default function WidgetPage() {
           setDriverName(data.data.name || null);
           setIsAuthenticated(true);
           localStorage.setItem('widget-driverId', data.data.driverId);
-        } else if (foundId) {
-          // Fallback: ID from URL params
-          setDriverId(foundId);
-          localStorage.setItem('widget-driverId', foundId);
-          setIsAuthenticated(true);
-        } else {
-          // Fallback: ID from localStorage
-          const savedId = localStorage.getItem('widget-driverId');
-          if (savedId) {
-            setDriverId(savedId);
-            setIsAuthenticated(true);
-          } else {
-            // Fallback: session from localStorage
-            try {
-              const sessionData = localStorage.getItem('eitaxi_session');
-              if (sessionData) {
-                const session = JSON.parse(sessionData);
-                if (session.driverId) {
-                  setDriverId(session.driverId);
-                  localStorage.setItem('widget-driverId', session.driverId);
-                  setIsAuthenticated(true);
-                }
-              }
-            } catch { /* ignore */ }
-          }
         }
       })
       .catch(err => {
         console.error('Session check error:', err);
-        // If API fails, try localStorage fallbacks
-        if (foundId) {
-          setDriverId(foundId);
-          localStorage.setItem('widget-driverId', foundId);
-          setIsAuthenticated(true);
-        } else {
-          const savedId = localStorage.getItem('widget-driverId');
-          if (savedId) {
-            setDriverId(savedId);
-            setIsAuthenticated(true);
-          } else {
-            try {
-              const sessionData = localStorage.getItem('eitaxi_session');
-              if (sessionData) {
-                const session = JSON.parse(sessionData);
-                if (session.driverId) {
-                  setDriverId(session.driverId);
-                  localStorage.setItem('widget-driverId', session.driverId);
-                  setIsAuthenticated(true);
-                }
-              }
-            } catch { /* ignore */ }
-          }
-        }
       })
       .finally(() => {
         setLoading(false);
@@ -274,16 +225,7 @@ export default function WidgetPage() {
     );
   }
 
-  // ===== Not authenticated → Login or enter ID manually =====
-  const handleManualIdEntry = () => {
-    const id = prompt('Introduce tu ID de conductor:');
-    if (id && id.trim()) {
-      setDriverId(id.trim());
-      localStorage.setItem('widget-driverId', id.trim());
-      setIsAuthenticated(true);
-    }
-  };
-
+  // ===== Not authenticated → Login prompt =====
   if (!isAuthenticated || !driverId) {
     return (
       <div className="min-h-screen bg-background p-6 flex flex-col items-center justify-center">
@@ -291,10 +233,10 @@ export default function WidgetPage() {
           <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center">
             <Navigation className="h-10 w-10 text-black" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">eitaxi GPS</h1>
+          <Link href="/" className="text-2xl font-bold mb-2 inline-block">eitaxi GPS</Link>
           <p className="text-muted-foreground mb-2">Control rapido de GPS para conductores</p>
           <p className="text-sm text-muted-foreground/70 mb-8">
-            Inicia sesion o introduce tu ID de conductor
+            Inicia sesion con tu cuenta de conductor para activar el seguimiento GPS
           </p>
 
           <a
@@ -304,14 +246,6 @@ export default function WidgetPage() {
             <LogIn className="h-5 w-5" />
             Iniciar sesion
           </a>
-
-          <button
-            onClick={handleManualIdEntry}
-            className="w-full py-3 mt-3 bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 font-medium rounded-2xl flex items-center justify-center gap-2"
-          >
-            <Key className="h-4 w-4" />
-            Introducir ID de conductor
-          </button>
 
           {!isStandalone && (
             <div className="mt-8">
@@ -355,7 +289,7 @@ export default function WidgetPage() {
               </div>
               <div>
                 <h3 className="font-semibold text-xl">Activar GPS</h3>
-                <p className="text-sm text-muted-foreground">Permiso de ubicacion</p>
+                <p className="text-sm text-muted-foreground">{t('geo.permissionLabel')}</p>
               </div>
             </div>
             <div className="space-y-4 mb-6">
@@ -464,7 +398,7 @@ export default function WidgetPage() {
             fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
               window.location.href = '/login?redirect=/widget';
             });
-          }} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-center">Cerrar sesion</button>
+          }} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-center">{t('dashboard.logout')}</button>
           <a href={`/dashboard/${driverId}`} className="flex-1 py-2 bg-muted text-muted-foreground rounded-lg text-center">Panel completo</a>
         </div>
       </div>

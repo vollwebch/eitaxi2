@@ -1,221 +1,164 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
-import { requireClientAuth } from '@/lib/client-auth'
-import { requireAuth } from '@/lib/auth'
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { requireClientAuth } from '@/lib/client-auth';
 
-// Valid status transitions
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  pending: ['confirmed', 'cancelled'],
-  confirmed: ['completed', 'cancelled'],
-  completed: [],
-  cancelled: [],
-}
+const VALID_STATUSES = ['pending', 'confirmed', 'completed', 'cancelled'];
 
-// GET /api/bookings/[id]
-export async function GET(
+// PATCH - Update booking status (driver or client)
+export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
+    const { id } = await params;
+    const body = await request.json();
+    const { status, driverId } = body;
 
-    // Try client auth first, then driver auth
-    let session:
-      | { type: 'client'; clientId: string }
-      | { type: 'driver'; driverId: string }
-
-    try {
-      const clientSession = await requireClientAuth(request)
-      session = { type: 'client', clientId: clientSession.clientId }
-    } catch {
-      try {
-        const driverSession = await requireAuth(request)
-        session = { type: 'driver', driverId: driverSession.driverId }
-      } catch {
-        return NextResponse.json(
-          { success: false, error: 'No autenticado' },
-          { status: 401 }
-        )
-      }
+    if (!status || !VALID_STATUSES.includes(status)) {
+      return NextResponse.json(
+        { success: false, error: `Estado invalido. Valores permitidos: ${VALID_STATUSES.join(', ')}` },
+        { status: 400 }
+      );
     }
 
+    // Verify booking exists
     const booking = await db.booking.findUnique({
       where: { id },
       include: {
-        client: { select: { id: true, name: true, avatarUrl: true, phone: true } },
-        driver: { select: { id: true, name: true, imageUrl: true, vehicleType: true, phone: true } },
-        messages: {
-          orderBy: { createdAt: 'asc' },
+        driver: {
+          select: { id: true, name: true },
+        },
+        client: {
+          select: { id: true },
         },
       },
-    })
+    });
 
     if (!booking) {
-      return NextResponse.json(
-        { success: false, error: 'Reserva no encontrada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Reserva no encontrada' }, { status: 404 });
     }
 
-    // Verify authorization
-    if (session.type === 'client' && booking.clientId !== session.clientId) {
-      return NextResponse.json(
-        { success: false, error: 'Acceso no autorizado' },
-        { status: 403 }
-      )
-    }
-
-    if (session.type === 'driver' && booking.driverId !== session.driverId) {
-      return NextResponse.json(
-        { success: false, error: 'Acceso no autorizado' },
-        { status: 403 }
-      )
-    }
-
-    return NextResponse.json({ success: true, data: booking })
-  } catch (error) {
-    console.error('Error fetching booking:', error)
-    return NextResponse.json(
-      { success: false, error: 'Error al obtener la reserva' },
-      { status: 500 }
-    )
-  }
-}
-
-// PUT /api/bookings/[id]
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { id } = await params
-
-    // Try client auth first, then driver auth
-    let session:
-      | { type: 'client'; clientId: string }
-      | { type: 'driver'; driverId: string }
-
+    // Try client authentication first (for cancellation)
+    let clientSession = null;
     try {
-      const clientSession = await requireClientAuth(request)
-      session = { type: 'client', clientId: clientSession.clientId }
+      clientSession = await requireClientAuth(request);
     } catch {
-      try {
-        const driverSession = await requireAuth(request)
-        session = { type: 'driver', driverId: driverSession.driverId }
-      } catch {
+      // No client session - proceed with driver auth check
+    }
+
+    if (clientSession) {
+      // Client-side: only allow cancelling own pending bookings
+      if (status !== 'cancelled') {
         return NextResponse.json(
-          { success: false, error: 'No autenticado' },
-          { status: 401 }
-        )
+          { success: false, error: 'Los clientes solo pueden cancelar reservas' },
+          { status: 403 }
+        );
       }
-    }
 
-    const body = await request.json()
-    const { status, notes } = body
-
-    // Get existing booking
-    const existing = await db.booking.findUnique({
-      where: { id },
-      include: {
-        client: { select: { id: true, name: true } },
-        driver: { select: { id: true, name: true } },
-      },
-    })
-
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'Reserva no encontrada' },
-        { status: 404 }
-      )
-    }
-
-    // Verify authorization
-    if (session.type === 'client' && existing.clientId !== session.clientId) {
-      return NextResponse.json(
-        { success: false, error: 'Acceso no autorizado' },
-        { status: 403 }
-      )
-    }
-
-    if (session.type === 'driver' && existing.driverId !== session.driverId) {
-      return NextResponse.json(
-        { success: false, error: 'Acceso no autorizado' },
-        { status: 403 }
-      )
-    }
-
-    // Validate status transition
-    const updateData: Record<string, unknown> = {}
-    let statusChanged = false
-
-    if (status && status !== existing.status) {
-      const allowed = VALID_TRANSITIONS[existing.status] || []
-      if (!allowed.includes(status)) {
+      if (!booking.clientId || booking.clientId !== clientSession.clientId) {
         return NextResponse.json(
-          {
-            success: false,
-            error: `Transición de estado no válida: ${existing.status} → ${status}`,
-          },
+          { success: false, error: 'No autorizado para modificar esta reserva' },
+          { status: 403 }
+        );
+      }
+
+      if (booking.status !== 'pending') {
+        return NextResponse.json(
+          { success: false, error: 'Solo se pueden cancelar reservas pendientes' },
           { status: 400 }
-        )
+        );
       }
-      updateData.status = status
-      statusChanged = true
+
+      // Update booking status (cancelled stays in bookings list, NOT moved to trash)
+      const updated = await db.booking.update({
+        where: { id },
+        data: { status: 'cancelled' },
+        include: {
+          driver: {
+            select: { id: true, name: true, phone: true },
+          },
+        },
+      });
+
+      // Create a notification for the client about the cancellation
+      await db.clientNotification.create({
+        data: {
+          clientId: clientSession.clientId,
+          type: 'booking_status',
+          title: 'Reserva cancelada',
+          message: `Tu reserva ${booking.reference} con ${booking.driver.name} ha sido cancelada.`,
+          link: `/cuenta?tab=reservas&booking=${booking.id}`,
+          bookingId: booking.id,
+        },
+      });
+
+      // Notify the driver about the cancellation
+      await db.driverNotification.create({
+        data: {
+          driverId: booking.driverId,
+          type: 'booking_cancelled',
+          title: 'Reserva cancelada',
+          message: `El cliente ha cancelado la reserva ${booking.reference}.`,
+          link: `/dashboard/${booking.driverId}?tab=bookings&booking=${booking.id}`,
+          bookingId: booking.id,
+        },
+      });
+
+      return NextResponse.json({ success: true, data: updated });
     }
 
-    if (notes !== undefined) {
-      updateData.notes = notes?.trim() || null
-    }
-
-    if (Object.keys(updateData).length === 0) {
+    // Driver-side: verify the driver owns the booking
+    if (driverId && driverId !== booking.driverId) {
       return NextResponse.json(
-        { success: false, error: 'No hay cambios para actualizar' },
-        { status: 400 }
-      )
+        { success: false, error: 'No autorizado para actualizar esta reserva' },
+        { status: 403 }
+      );
     }
 
-    // Update booking
+    // Update status
+    const updateData: any = { status };
+
     const updated = await db.booking.update({
       where: { id },
       data: updateData,
-      include: {
-        client: { select: { id: true, name: true } },
-        driver: { select: { id: true, name: true, imageUrl: true, vehicleType: true } },
-      },
-    })
+    });
 
-    // Create notification for client if status changed
-    if (statusChanged) {
-      const statusLabels: Record<string, string> = {
-        confirmed: 'Confirmada',
-        completed: 'Completada',
-        cancelled: 'Cancelada',
-      }
-
-      await db.notification.create({
-        data: {
-          clientId: existing.clientId,
-          title: 'Estado de reserva actualizado',
-          body: `Tu reserva con ${existing.driver.name} ha sido actualizada a: ${statusLabels[status] || status}.`,
-          type: 'booking_status_changed',
-          link: `/bookings/${id}`,
-          metadata: JSON.stringify({
-            bookingId: id,
-            driverId: existing.driverId,
-            driverName: existing.driver.name,
-            oldStatus: existing.status,
-            newStatus: status,
-          }),
+    // Notificar al cliente del cambio de estado
+    if (booking.clientId) {
+      const driverName = booking.driver?.name || 'el conductor';
+      const ref = booking.reference;
+      const notificationMap: Record<string, { title: string; message: string }> = {
+        confirmed: {
+          title: 'Reserva confirmada',
+          message: `${driverName} ha confirmado tu reserva ${ref}.`,
         },
-      })
+        completed: {
+          title: 'Viaje completado',
+          message: `${driverName} ha completado tu viaje ${ref}.`,
+        },
+        cancelled: {
+          title: 'Reserva rechazada',
+          message: `${driverName} ha rechazado tu reserva ${ref}.`,
+        },
+      };
+      const notif = notificationMap[status];
+      if (notif) {
+        await db.clientNotification.create({
+          data: {
+            clientId: booking.clientId,
+            type: 'booking_status',
+            title: notif.title,
+            message: notif.message,
+            link: `/cuenta?tab=reservas&booking=${booking.id}`,
+            bookingId: booking.id,
+          },
+        });
+      }
     }
 
-    return NextResponse.json({ success: true, data: updated })
+    return NextResponse.json({ success: true, data: updated });
   } catch (error) {
-    console.error('Error updating booking:', error)
-    return NextResponse.json(
-      { success: false, error: 'Error al actualizar la reserva' },
-      { status: 500 }
-    )
+    console.error('Update booking error:', error);
+    return NextResponse.json({ success: false, error: 'Error al actualizar la reserva' }, { status: 500 });
   }
 }

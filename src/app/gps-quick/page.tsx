@@ -17,6 +17,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 
 // ============================================
 // PÁGINA QUICK GPS PARA TAXISTAS
@@ -247,10 +248,12 @@ export default function GPSQuickPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-yellow-400 mb-4">
-              <span className="text-4xl">🚕</span>
-            </div>
-            <h1 className="text-3xl font-bold text-white">eitaxi</h1>
+            <Link href="/" className="inline-flex flex-col items-center">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-yellow-400 mb-4">
+                <span className="text-4xl">🚕</span>
+              </div>
+              <span className="text-3xl font-bold text-white">eitaxi</span>
+            </Link>
             <p className="text-gray-400 mt-2">GPS rápido para taxistas</p>
           </div>
 
@@ -323,7 +326,7 @@ export default function GPSQuickPage() {
         animate={{ opacity: 1, y: 0 }}
         className="absolute top-4 left-0 right-0 text-center"
       >
-        <span className="text-xl font-bold text-yellow-400">🚕 eitaxi</span>
+        <Link href="/" className="text-xl font-bold text-yellow-400 hover:text-yellow-300">🚕 eitaxi</Link>
       </motion.div>
 
       {/* Status */}

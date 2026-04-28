@@ -18,10 +18,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useTranslations } from 'next-intl';
 
 export default function RestablecerPasswordPage() {
   const params = useParams();
   const router = useRouter();
+  const t = useTranslations('password');
+  const tCommon = useTranslations('common');
   const token = params.token as string;
 
   const [password, setPassword] = useState("");
@@ -34,7 +37,6 @@ export default function RestablecerPasswordPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Verificar token
     const verifyToken = async () => {
       try {
         const response = await fetch(`/api/auth/reset-password?token=${token}`);
@@ -43,10 +45,10 @@ export default function RestablecerPasswordPage() {
         if (data.success) {
           setValidToken(true);
         } else {
-          setError(data.error || "Enlace inválido o expirado");
+          setError(data.error || t('invalidLink'));
         }
       } catch (err) {
-        setError("Error al verificar el enlace");
+        setError(tCommon('error'));
       } finally {
         setVerifying(false);
       }
@@ -61,13 +63,13 @@ export default function RestablecerPasswordPage() {
     e.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres");
+    if (password.length < 8) {
+      setError(t('minLength'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
+      setError(t('mismatch'));
       return;
     }
 
@@ -86,10 +88,10 @@ export default function RestablecerPasswordPage() {
         setSuccess(true);
         setTimeout(() => router.push("/login"), 3000);
       } else {
-        setError(data.error || "Error al restablecer la contraseña");
+        setError(data.error || tCommon('error'));
       }
     } catch (err) {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setLoading(false);
     }
@@ -120,20 +122,20 @@ export default function RestablecerPasswordPage() {
             {verifying ? (
               <div className="text-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-yellow-400 mx-auto mb-4" />
-                <p className="text-muted-foreground">Verificando enlace...</p>
+                <p className="text-muted-foreground">{t('verifying')}</p>
               </div>
             ) : success ? (
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-500/20 flex items-center justify-center">
                   <CheckCircle className="h-8 w-8 text-green-400" />
                 </div>
-                <h1 className="text-xl font-bold mb-2">¡Contraseña actualizada!</h1>
+                <h1 className="text-xl font-bold mb-2">{t('passwordUpdated')}</h1>
                 <p className="text-muted-foreground mb-6">
-                  Tu contraseña ha sido restablecida. Serás redirigido al login...
+                  {t('passwordUpdatedSubtitle')}
                 </p>
                 <Link href="/login">
                   <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
-                    Ir al login
+                    {t('goToLogin')}
                   </Button>
                 </Link>
               </div>
@@ -142,23 +144,23 @@ export default function RestablecerPasswordPage() {
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/20 flex items-center justify-center">
                   <AlertCircle className="h-8 w-8 text-red-400" />
                 </div>
-                <h1 className="text-xl font-bold mb-2">Enlace inválido</h1>
+                <h1 className="text-xl font-bold mb-2">{t('invalidLink')}</h1>
                 <p className="text-muted-foreground mb-6">
-                  {error || "Este enlace ha expirado o no es válido."}
+                  {error || t('invalidLinkSubtitle')}
                 </p>
                 <Link href="/recuperar-password">
                   <Button className="w-full bg-yellow-400 text-black hover:bg-yellow-500">
-                    Solicitar nuevo enlace
+                    {t('requestNewLink')}
                   </Button>
                 </Link>
               </div>
             ) : (
               <>
                 <h1 className="text-2xl font-bold text-center mb-2">
-                  Nueva contraseña
+                  {t('newPassword')}
                 </h1>
                 <p className="text-muted-foreground text-center mb-6">
-                  Introduce tu nueva contraseña
+                  {t('newPasswordSubtitle')}
                 </p>
 
                 {error && (
@@ -170,7 +172,7 @@ export default function RestablecerPasswordPage() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <Label htmlFor="password">Nueva contraseña</Label>
+                    <Label htmlFor="password">{t('newPassword')}</Label>
                     <div className="relative mt-1.5">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -195,7 +197,7 @@ export default function RestablecerPasswordPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+                    <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
                     <div className="relative mt-1.5">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -220,10 +222,10 @@ export default function RestablecerPasswordPage() {
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Guardando...
+                        {t('saving')}
                       </>
                     ) : (
-                      "Guardar nueva contraseña"
+                      t('saveButton')
                     )}
                   </Button>
                 </form>

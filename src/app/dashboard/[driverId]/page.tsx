@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -35,6 +35,7 @@ import {
   Loader2,
   ArrowLeft,
   Calendar,
+  CalendarDays,
   Navigation,
   AlertTriangle,
   Radio,
@@ -71,9 +72,16 @@ import GPSTracking from "@/components/GPSTracking";
 import RoutesZonesManager from "@/components/RoutesZonesManager";
 import VehicleManager from "@/components/VehicleManager";
 import FixedRoutesManager, { FixedRoute } from "@/components/FixedRoutesManager";
+import DashboardBookingsTab from "@/components/DashboardBookingsTab";
+import DashboardChatTab from "@/components/DashboardChatTab";
+import DashboardTrashTab from "@/components/DashboardTrashTab";
+import DriverNotificationsPanel from "@/components/dashboard/DriverNotificationsPanel";
 import { useSession } from "@/hooks/useSession";
+import { AuthGuard } from "@/components/SessionGuard";
 import { LogOut } from "lucide-react";
 import { SERVICE_OPTIONS as serviceOptions, LANGUAGE_OPTIONS as languageOptions, VEHICLE_TYPES as vehicleTypes } from "@/lib/constants";
+import { useTranslations } from 'next-intl';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 // Types
 interface City {
@@ -181,10 +189,23 @@ const serviceOptionsWithIcons = serviceOptions.map(s => ({
   icon: SERVICE_ICONS[s.id] || Building2,
 }));
 
-export default function DriverDashboardPage() {
+export default function DriverDashboardPageWrapper() {
+  return (
+    <AuthGuard>
+      <DriverDashboardPage />
+    </AuthGuard>
+  );
+}
+
+function DriverDashboardPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const driverId = params.driverId as string;
+
+  // Translations
+  const t = useTranslations('dashboard');
+  const tCommon = useTranslations('common');
 
   // State
   const [loading, setLoading] = useState(true);
@@ -231,7 +252,7 @@ export default function DriverDashboardPage() {
       return {
         ...prev,
         vehicleTypes: newTypes,
-        vehicleType: newTypes[0] || "taxi" // Mantener el primero como principal para compatibilidad
+        vehicleType: newTypes[0] || "taxi"
       };
     });
   };
@@ -240,7 +261,7 @@ export default function DriverDashboardPage() {
   const [schedules, setSchedules] = useState<DaySchedule[]>([]);
   const [is24h, setIs24h] = useState(true);
 
-  // Service zones with exclusions - MISMO NOMBRE que en Registro
+  // Service zones with exclusions
   const [serviceZonesWithExclusions, setServiceZonesWithExclusions] = useState<Array<{
     id?: string;
     zoneName: string;
@@ -274,6 +295,44 @@ export default function DriverDashboardPage() {
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [gpsReminderDismissed, setGpsReminderDismissed] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
+  const [autoExpandBookingId, setAutoExpandBookingId] = useState<string | null>(null);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  const handleOpenBooking = useCallback((bookingId: string) => {
+    setAutoExpandBookingId(bookingId);
+    setActiveTab("bookings");
+  }, []);
+
+  const tabParam = searchParams.get('tab');
+  const bookingParam = searchParams.get('booking');
+
+  // Handle URL params from notification links
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+    if (bookingParam) {
+      setAutoExpandBookingId(bookingParam);
+    }
+  }, [tabParam, bookingParam]);
+
+  // Polling del contador de mensajes sin leer (siempre activo)
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch("/api/chat/driver");
+        const data = await res.json();
+        if (data.success && typeof data.data?.totalUnread === "number") {
+          setChatUnreadCount(data.data.totalUnread);
+        }
+      } catch {
+        // silencio
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Security/Account state - for changing password and email
   const [showSecurityForm, setShowSecurityForm] = useState(false);
@@ -311,7 +370,6 @@ export default function DriverDashboardPage() {
     
     if (driverId) {
       fetchTracking();
-      // Refrescar cada 30 segundos
       const interval = setInterval(fetchTracking, 30000);
       return () => clearInterval(interval);
     }
@@ -355,15 +413,16 @@ export default function DriverDashboardPage() {
           });
           setRoutes(data.data.driverRoutes || []);
           // Handle schedules - prefer workingHours (new format) over schedules (old format)
+          console.log('🔍 Dashboard - Datos del driver:', {
+            workingHours: data.data.workingHours,
+            schedules: data.data.schedules,
+            isAvailable24h: data.data.isAvailable24h
+          });
           
-          // Priorizar workingHours que tiene el formato nuevo { dayOfWeek, mode, slots }
           if (data.data.workingHours && Array.isArray(data.data.workingHours) && data.data.workingHours.length > 0) {
-            // Use workingHours directly (new format with mode and slots)
+            console.log('🔍 Dashboard - Usando workingHours:', data.data.workingHours);
             setSchedules(data.data.workingHours);
           } else if (data.data.schedules && Array.isArray(data.data.schedules) && data.data.schedules.length > 0) {
-            // Convert old format to new format
-            // El formato antiguo es: { dayOfWeek, startTime, endTime, isActive }
-            // El formato nuevo es: { dayOfWeek, mode: 'specific'|'closed'|'all_day', slots: [{id, startTime, endTime}] }
             const convertedSchedules: DaySchedule[] = (data.data.schedules as Array<{
               dayOfWeek: number;
               startTime: string;
@@ -374,29 +433,24 @@ export default function DriverDashboardPage() {
               mode: s.isActive ? 'specific' as const : 'closed' as const,
               slots: s.isActive ? [{ id: Math.random().toString(36).substring(7), startTime: s.startTime, endTime: s.endTime }] : []
             }));
+            console.log('🔍 Dashboard - Horarios convertidos de formato antiguo:', convertedSchedules);
             setSchedules(convertedSchedules);
           } else {
+            console.log('🔍 Dashboard - Sin horarios guardados');
             setSchedules([]);
           }
-          // Set 24h mode from data
-          // Usar hasRealSchedules de la API si está disponible
           const hasRealSchedules = data.data.hasRealSchedules ?? false;
-          
-          // Lógica clara:
-          // - Si hay horarios guardados → is24h = false (mostrar horarios fijos)
-          // - Si no hay horarios guardados → is24h = true (modo flexible / sin horario fijo)
           const finalIs24h = !hasRealSchedules;
           setIs24h(finalIs24h);
+          console.log('🔍 Dashboard - hasRealSchedules:', hasRealSchedules, 'is24h final:', finalIs24h);
           setImagePreview(data.data.imageUrl || null);
-          // Set service zones - MISMO NOMBRE que en Registro
           setServiceZonesWithExclusions(data.data.driverServiceZones || []);
-          // Fetch vehicles
           fetchVehicles();
         } else {
-          setError(data.error || "Conductor no encontrado");
+          setError(data.error || t('notFound'));
         }
       } catch (err) {
-        setError("Error al cargar los datos");
+        setError(t('loadError'));
       } finally {
         setLoading(false);
       }
@@ -405,14 +459,14 @@ export default function DriverDashboardPage() {
     if (driverId) {
       fetchDriver();
     }
-  }, [driverId]);
+  }, [driverId, t]);
 
   // Handle image upload
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setError("La imagen no puede superar los 5MB");
+        setError(t('imageSizeError'));
         return;
       }
       setImageFile(file);
@@ -459,7 +513,7 @@ export default function DriverDashboardPage() {
   // Add vehicle
   const handleAddVehicle = async () => {
     if (!newVehicle.vehicleType) {
-      setError("Selecciona un tipo de vehículo");
+      setError(t('selectVehicleType'));
       return;
     }
 
@@ -488,12 +542,12 @@ export default function DriverDashboardPage() {
           licensePlate: "",
         });
         setShowVehicleForm(false);
-        setSuccess("Vehículo añadido correctamente");
+        setSuccess(t('vehicle.added'));
       } else {
-        setError(data.error || "Error al añadir vehículo");
+        setError(data.error || t('vehicle.addError'));
       }
     } catch (err) {
-      setError("Error de conexión");
+      setError(tCommon('connectionError'));
     }
   };
 
@@ -522,18 +576,18 @@ export default function DriverDashboardPage() {
       if (data.success) {
         setVehicles(vehicles.map(v => v.id === data.data.id ? data.data : v));
         setEditingVehicle(null);
-        setSuccess("Vehículo actualizado correctamente");
+        setSuccess(t('vehicle.updated'));
       } else {
-        setError(data.error || "Error al actualizar vehículo");
+        setError(data.error || t('vehicle.updateError'));
       }
     } catch (err) {
-      setError("Error de conexión");
+      setError(tCommon('connectionError'));
     }
   };
 
   // Delete vehicle
   const handleDeleteVehicle = async (vehicleId: string) => {
-    if (!confirm("¿Estás seguro de eliminar este vehículo?")) return;
+    if (!confirm(t('vehicle.confirmDelete'))) return;
 
     try {
       const res = await fetch(`/api/vehicles?id=${vehicleId}&driverId=${driverId}`, {
@@ -543,12 +597,12 @@ export default function DriverDashboardPage() {
       const data = await res.json();
       if (data.success) {
         setVehicles(vehicles.filter(v => v.id !== vehicleId));
-        setSuccess("Vehículo eliminado correctamente");
+        setSuccess(t('vehicle.deleted'));
       } else {
-        setError(data.error || "Error al eliminar vehículo");
+        setError(data.error || t('vehicle.deleteError'));
       }
     } catch (err) {
-      setError("Error de conexión");
+      setError(tCommon('connectionError'));
     }
   };
 
@@ -571,10 +625,10 @@ export default function DriverDashboardPage() {
           ...v,
           isPrimary: v.id === vehicleId
         })));
-        setSuccess("Vehículo principal actualizado");
+        setSuccess(t('vehicle.primaryUpdated'));
       }
     } catch (err) {
-      setError("Error al actualizar vehículo principal");
+      setError(t('vehicle.primaryUpdateError'));
     }
   };
 
@@ -620,18 +674,34 @@ export default function DriverDashboardPage() {
 
       if (data.success) {
         setDriver(data.data);
-        
-        // Actualizar zonas si el API las devuelve
+
         if (data.data.driverServiceZones) {
           setServiceZonesWithExclusions(data.data.driverServiceZones);
         }
-        setSuccess("Perfil actualizado correctamente");
+
+        // Refrescar horarios inmediatamente para que el GPS se sincronice al instante
+        if (data.data.workingHours && Array.isArray(data.data.workingHours) && data.data.workingHours.length > 0) {
+          setSchedules(data.data.workingHours);
+          const hasRealSchedules = data.data.workingHours.some(
+            (s: { mode: string; slots?: unknown[] }) => s.mode !== 'closed' && s.slots && s.slots.length > 0
+          );
+          setIs24h(!hasRealSchedules);
+        } else {
+          setSchedules([]);
+          setIs24h(true);
+        }
+
+        setSuccess(t('profileUpdated'));
         setTimeout(() => setSuccess(null), 3000);
       } else {
-        setError(data.error || "Error al actualizar el perfil");
+        if (data.errors && Array.isArray(data.errors)) {
+          setError(data.errors.join('\n'));
+        } else {
+          setError(data.error || t('profileUpdateError'));
+        }
       }
     } catch (err) {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setSaving(false);
     }
@@ -644,27 +714,27 @@ export default function DriverDashboardPage() {
 
     // Validation
     if (securityForm.newEmail && !securityForm.currentPassword) {
-      setError("Debes introducir tu contraseña actual para cambiar el email");
+      setError(t('emailChangePasswordRequired'));
       return;
     }
 
     if (securityForm.newPassword) {
-      if (securityForm.newPassword.length < 8) {
-        setError("La nueva contraseña debe tener al menos 8 caracteres e incluir una letra y un número");
+      if (securityForm.newPassword.length < 6) {
+        setError(t('security.minPassword'));
         return;
       }
       if (!securityForm.currentPassword) {
-        setError("Debes introducir tu contraseña actual");
+        setError(t('security.currentPasswordRequired'));
         return;
       }
       if (securityForm.newPassword !== securityForm.confirmPassword) {
-        setError("Las contraseñas nuevas no coinciden");
+        setError(t('security.passwordMismatch'));
         return;
       }
     }
 
     if (!securityForm.newEmail && !securityForm.newPassword) {
-      setError("No hay cambios que guardar");
+      setError(t('noChanges'));
       return;
     }
 
@@ -685,7 +755,7 @@ export default function DriverDashboardPage() {
       const data = await response.json();
 
       if (data.success) {
-        setSuccess(data.message || "Cambios guardados correctamente");
+        setSuccess(data.message || t('changesSaved'));
         setSecurityForm({
           newEmail: "",
           currentPassword: "",
@@ -714,10 +784,10 @@ export default function DriverDashboardPage() {
         
         setTimeout(() => setSuccess(null), 5000);
       } else {
-        setError(data.error || "Error al guardar los cambios");
+        setError(data.error || t('saveError'));
       }
     } catch (err) {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setSecurityLoading(false);
     }
@@ -729,7 +799,7 @@ export default function DriverDashboardPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-yellow-400 mx-auto mb-4" />
-          <p className="text-muted-foreground">Cargando panel...</p>
+          <p className="text-muted-foreground">{t('loading')}</p>
         </div>
       </div>
     );
@@ -737,8 +807,10 @@ export default function DriverDashboardPage() {
 
   // Error state
   if (error && !driver) {
-    const handleLogout = () => {
+    const handleLogout = async () => {
+      try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
       localStorage.removeItem('eitaxi_session');
+      localStorage.removeItem('eitaxi_driver_id');
       document.cookie = 'eitaxi_driver_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       router.push('/login');
     };
@@ -747,7 +819,7 @@ export default function DriverDashboardPage() {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full p-8 text-center border-border">
           <Car className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Panel no encontrado</h1>
+          <h1 className="text-2xl font-bold mb-2">{t('notFound')}</h1>
           <p className="text-muted-foreground mb-6">{error}</p>
           <div className="flex flex-col gap-3">
             <Button 
@@ -755,12 +827,12 @@ export default function DriverDashboardPage() {
               className="bg-yellow-400 text-black hover:bg-yellow-500"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Iniciar sesión
+              {t('loginButton')}
             </Button>
             <Link href="/">
               <Button variant="outline" className="w-full">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver al inicio
+                {t('backToHome')}
               </Button>
             </Link>
           </div>
@@ -790,26 +862,30 @@ export default function DriverDashboardPage() {
 
             {/* Actions */}
             <div className="flex items-center gap-1 sm:gap-3">
+              <DriverNotificationsPanel />
+              <LanguageSwitcher />
               <Link href={publicUrl} target="_blank" className="hidden sm:block">
                 <Button variant="outline" size="sm">
                   <Eye className="mr-2 h-4 w-4" />
-                  Ver perfil público
+                  {t('viewPublicProfile')}
                 </Button>
               </Link>
               <Button
                 variant="ghost"
                 size="sm"
                 className="text-muted-foreground hover:text-destructive"
-                onClick={() => {
-                  if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+                onClick={async () => {
+                  if (confirm(t('confirmLogout'))) {
+                    try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
                     localStorage.removeItem('eitaxi_session');
+                    localStorage.removeItem('eitaxi_driver_id');
                     document.cookie = 'eitaxi_driver_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
                     router.push('/');
                   }
                 }}
               >
                 <LogOut className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Cerrar sesión</span>
+                <span className="hidden sm:inline">{t('logout')}</span>
               </Button>
               <Button
                 className="bg-yellow-400 text-black hover:bg-yellow-500"
@@ -820,14 +896,14 @@ export default function DriverDashboardPage() {
                 {saving ? (
                   <>
                     <Loader2 className="mr-1 sm:mr-2 h-4 w-4 animate-spin" />
-                    <span className="hidden sm:inline">Guardando...</span>
+                    <span className="hidden sm:inline">{t('saving')}</span>
                     <span className="sm:hidden">...</span>
                   </>
                 ) : (
                   <>
                     <Save className="mr-1 sm:mr-2 h-4 w-4" />
-                    <span className="hidden sm:inline">Guardar cambios</span>
-                    <span className="sm:hidden">Guardar</span>
+                    <span className="hidden sm:inline">{t('saveChanges')}</span>
+                    <span className="sm:hidden">{t('save')}</span>
                   </>
                 )}
               </Button>
@@ -852,13 +928,13 @@ export default function DriverDashboardPage() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive"
+            className="mb-6 p-4 bg-destructive/10 border border-destructive/30 rounded-lg text-destructive whitespace-pre-line"
           >
             {error}
           </motion.div>
         )}
 
-        {/* GPS Reminder Banner - Aparece si el GPS está desactivado */}
+        {/* GPS Reminder Banner */}
         <AnimatePresence>
           {!trackingEnabled && !gpsReminderDismissed && (
             <motion.div
@@ -887,11 +963,11 @@ export default function DriverDashboardPage() {
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-orange-400 flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5" />
-                      ¡Activa tu GPS para recibir más clientes!
+                      {t('gpsReminder')}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Los clientes pueden ver tu ubicación en tiempo real y contactarte más fácilmente. 
-                      <span className="text-orange-400 font-medium"> Aumenta tus oportunidades de trabajo.</span>
+                      {t('gpsReminderDesc')}
+                      <span className="text-orange-400 font-medium">{t('gpsReminderHighlight')}</span>
                     </p>
                   </div>
                   
@@ -907,7 +983,7 @@ export default function DriverDashboardPage() {
                       }}
                     >
                       <Navigation className="mr-2 h-4 w-4" />
-                      Activar GPS
+                      {t('activateGps')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -915,7 +991,7 @@ export default function DriverDashboardPage() {
                       className="text-muted-foreground hover:text-foreground"
                       onClick={() => setGpsReminderDismissed(true)}
                     >
-                      Recordar después
+                      {t('remindLater')}
                     </Button>
                   </div>
                 </div>
@@ -924,7 +1000,7 @@ export default function DriverDashboardPage() {
           )}
         </AnimatePresence>
 
-        {/* Zones Warning Banner - Aparece si no hay zonas de pickup */}
+        {/* Zones Warning Banner */}
         <AnimatePresence>
           {serviceZonesWithExclusions.filter(z => z.zoneMode === 'pickup').length === 0 && !zonesWarningDismissed && (
             <motion.div
@@ -953,11 +1029,10 @@ export default function DriverDashboardPage() {
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
                       <AlertTriangle className="h-5 w-5" />
-                      ¡No tienes zonas de recogida configuradas!
+                      {t('zonesWarning')}
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Sin zonas de recogida, <span className="text-red-400 font-medium">los clientes NO pueden encontrarte</span> cuando buscan un taxi.
-                      Configura al menos una zona para aparecer en las búsquedas.
+                      {t('zonesWarningDesc')}
                     </p>
                   </div>
                   
@@ -973,7 +1048,7 @@ export default function DriverDashboardPage() {
                       }}
                     >
                       <MapPin className="mr-2 h-4 w-4" />
-                      Configurar zonas
+                      {t('configureZones')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -981,7 +1056,7 @@ export default function DriverDashboardPage() {
                       className="text-muted-foreground hover:text-foreground"
                       onClick={() => setZonesWarningDismissed(true)}
                     >
-                      Recordar después
+                      {t('remindLater')}
                     </Button>
                   </div>
                 </div>
@@ -990,7 +1065,7 @@ export default function DriverDashboardPage() {
           )}
         </AnimatePresence>
 
-        {/* GPS Status Indicator en el header de las stats */}
+        {/* GPS Status Indicator */}
         <div className="flex items-center gap-2 mb-4">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
             trackingEnabled 
@@ -998,7 +1073,7 @@ export default function DriverDashboardPage() {
               : "bg-red-500/20 text-red-400 border border-red-500/30"
           }`}>
             <Radio className={`h-4 w-4 ${trackingEnabled ? "animate-pulse" : ""}`} />
-            GPS {trackingEnabled ? "Activado" : "Desactivado"}
+            GPS {trackingEnabled ? t('gpsActivated') : t('gpsDeactivated')}
           </div>
         </div>
 
@@ -1012,7 +1087,7 @@ export default function DriverDashboardPage() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{driver?.views || 0}</div>
-                  <div className="text-xs text-muted-foreground">Vistas del perfil</div>
+                  <div className="text-xs text-muted-foreground">{t('stats.profileViews')}</div>
                 </div>
               </div>
             </CardContent>
@@ -1025,7 +1100,7 @@ export default function DriverDashboardPage() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{driver?.contacts || 0}</div>
-                  <div className="text-xs text-muted-foreground">Contactos</div>
+                  <div className="text-xs text-muted-foreground">{t('stats.contacts')}</div>
                 </div>
               </div>
             </CardContent>
@@ -1038,7 +1113,7 @@ export default function DriverDashboardPage() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{driver?.rating.toFixed(1) || "5.0"}</div>
-                  <div className="text-xs text-muted-foreground">Valoración</div>
+                  <div className="text-xs text-muted-foreground">{t('stats.rating')}</div>
                 </div>
               </div>
             </CardContent>
@@ -1051,7 +1126,7 @@ export default function DriverDashboardPage() {
                 </div>
                 <div>
                   <div className="text-2xl font-bold">{driver?.experience || 0}</div>
-                  <div className="text-xs text-muted-foreground">Años experiencia</div>
+                  <div className="text-xs text-muted-foreground">{t('stats.yearsExperience')}</div>
                 </div>
               </div>
             </CardContent>
@@ -1062,7 +1137,7 @@ export default function DriverDashboardPage() {
         <Card className="border-border bg-card mb-8">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-medium">Completitud del perfil</span>
+              <span className="font-medium">{t('completeness')}</span>
               <span className="text-yellow-400 font-medium">
                 {Math.round(
                   ([
@@ -1101,7 +1176,7 @@ export default function DriverDashboardPage() {
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="font-medium mb-1">Tu URL pública</h3>
+                <h3 className="font-medium mb-1">{t('publicUrl')}</h3>
                 <code className="text-yellow-400 text-sm">
                   eitaxi.ch{publicUrl}
                 </code>
@@ -1111,7 +1186,7 @@ export default function DriverDashboardPage() {
                 size="sm"
                 onClick={() => navigator.clipboard.writeText(`https://eitaxi.ch${publicUrl}`)}
               >
-                Copiar enlace
+                {t('copyLink')}
               </Button>
             </div>
           </CardContent>
@@ -1126,9 +1201,9 @@ export default function DriverDashboardPage() {
                   <Smartphone className="h-6 w-6 text-purple-400" />
                 </div>
                 <div>
-                  <h3 className="font-medium mb-1">Control rápido de GPS</h3>
+                  <h3 className="font-medium mb-1">{t('quickGps')}</h3>
                   <p className="text-sm text-muted-foreground">
-                    Abre esta página para activar/desactivar el GPS con un toque
+                    {t('quickGpsDesc')}
                   </p>
                 </div>
               </div>
@@ -1137,7 +1212,7 @@ export default function DriverDashboardPage() {
                   className="bg-purple-500 hover:bg-purple-600 text-white"
                 >
                   <Smartphone className="h-4 w-4 mr-2" />
-                  Abrir página GPS
+                  {t('openGpsPage')}
                 </Button>
               </Link>
             </div>
@@ -1148,38 +1223,60 @@ export default function DriverDashboardPage() {
         <div ref={tabsRef}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="w-full overflow-x-auto pb-2 -mb-2 scrollbar-hide">
-            <TabsList className="inline-flex w-auto min-w-full md:grid md:grid-cols-8 md:w-full">
+            <TabsList className="inline-flex w-auto min-w-full md:grid md:grid-cols-11 md:w-full">
               <TabsTrigger value="basic" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <User className="mr-1.5 h-4 w-4" />
-                Básicos
+                {t('tabs.basic')}
               </TabsTrigger>
               <TabsTrigger value="vehicle" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <Car className="mr-1.5 h-4 w-4" />
-                Vehículo
+                {t('tabs.vehicle')}
               </TabsTrigger>
               <TabsTrigger value="services" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <Star className="mr-1.5 h-4 w-4" />
-                Servicios
+                {t('tabs.services')}
               </TabsTrigger>
               <TabsTrigger value="prices" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <DollarSign className="mr-1.5 h-4 w-4" />
-                Precios
+                {t('tabs.prices')}
               </TabsTrigger>
               <TabsTrigger value="schedule" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <Clock className="mr-1.5 h-4 w-4" />
-                Horarios
+                {t('tabs.schedule')}
               </TabsTrigger>
               <TabsTrigger value="zones" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <MapPin className="mr-1.5 h-4 w-4" />
-                Zonas
+                {t('tabs.zones')}
+              </TabsTrigger>
+              <TabsTrigger value="bookings" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap relative">
+                <CalendarDays className="mr-1.5 h-4 w-4" />
+                Reservas
+                {chatUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {chatUnreadCount > 9 ? "9+" : chatUnreadCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="chat" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap relative">
+                <MessageCircle className="mr-1.5 h-4 w-4" />
+                Chat
+                {chatUnreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {chatUnreadCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="trash" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                Papelera
               </TabsTrigger>
               <TabsTrigger value="gps" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <Navigation className="mr-1.5 h-4 w-4" />
-                GPS
+                {t('tabs.gps')}
               </TabsTrigger>
               <TabsTrigger value="privacy" className="flex-shrink-0 text-xs sm:text-sm px-3 sm:px-4 whitespace-nowrap">
                 <Shield className="mr-1.5 h-4 w-4" />
-                Privacidad
+                {t('tabs.privacy')}
               </TabsTrigger>
             </TabsList>
           </div>
@@ -1190,13 +1287,13 @@ export default function DriverDashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5 text-yellow-400" />
-                  Información básica
+                  {t('basicInfo.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Photo */}
                 <div>
-                  <Label>Foto de perfil</Label>
+                  <Label>{t('basicInfo.profilePhoto')}</Label>
                   <div className="flex items-center gap-4 mt-2">
                     {imagePreview ? (
                       <div className="relative">
@@ -1234,15 +1331,15 @@ export default function DriverDashboardPage() {
                       className="hidden"
                     />
                     <div className="text-sm text-muted-foreground">
-                      <p>JPG, PNG. Máximo 5MB</p>
-                      <p>Recomendado: 400x400px</p>
+                      <p>{t('basicInfo.photoHint')}</p>
+                      <p>{t('basicInfo.photoRecommended')}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="name">Nombre *</Label>
+                    <Label htmlFor="name">{t('basicInfo.name')} *</Label>
                     <Input
                       id="name"
                       value={formData.name}
@@ -1251,7 +1348,7 @@ export default function DriverDashboardPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="experience">Años de experiencia</Label>
+                    <Label htmlFor="experience">{t('basicInfo.yearsExperience')}</Label>
                     <Input
                       id="experience"
                       type="number"
@@ -1265,7 +1362,7 @@ export default function DriverDashboardPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="phone">Teléfono *</Label>
+                    <Label htmlFor="phone">{t('basicInfo.phone')} *</Label>
                     <Input
                       id="phone"
                       value={formData.phone}
@@ -1285,7 +1382,7 @@ export default function DriverDashboardPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t('basicInfo.email')}</Label>
                   <Input
                     id="email"
                     type="email"
@@ -1296,13 +1393,13 @@ export default function DriverDashboardPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="description">Descripción</Label>
+                  <Label htmlFor="description">{t('basicInfo.description')}</Label>
                   <Textarea
                     id="description"
                     value={formData.description || ""}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="mt-1.5 min-h-[120px]"
-                    placeholder="Cuéntanos sobre tu servicio..."
+                    placeholder={t('basicInfo.descriptionPlaceholder')}
                   />
                 </div>
 
@@ -1311,11 +1408,11 @@ export default function DriverDashboardPage() {
                 {/* Social Media */}
                 <h3 className="font-medium flex items-center gap-2">
                   <Globe className="h-4 w-4 text-yellow-400" />
-                  Redes sociales
+                  {t('basicInfo.socialMedia')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="website">Sitio web</Label>
+                    <Label htmlFor="website">{t('basicInfo.website')}</Label>
                     <div className="relative mt-1.5">
                       <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -1328,7 +1425,7 @@ export default function DriverDashboardPage() {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="instagram">Instagram</Label>
+                    <Label htmlFor="instagram">{t('basicInfo.instagram')}</Label>
                     <div className="relative mt-1.5">
                       <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -1341,7 +1438,7 @@ export default function DriverDashboardPage() {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="facebook">Facebook</Label>
+                    <Label htmlFor="facebook">{t('basicInfo.facebook')}</Label>
                     <div className="relative mt-1.5">
                       <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -1358,7 +1455,7 @@ export default function DriverDashboardPage() {
             </Card>
           </TabsContent>
 
-          {/* Vehicle Tab - Usando VehicleManager compartido */}
+          {/* Vehicle Tab */}
           <TabsContent value="vehicle">
             <Card className="border-border bg-card">
               <CardContent className="pt-6">
@@ -1370,7 +1467,6 @@ export default function DriverDashboardPage() {
                   onSuccess={(msg) => {
                     setSuccess(msg);
                     setTimeout(() => setSuccess(null), 3000);
-                    // Refrescar vehículos desde el servidor
                     fetchVehicles();
                   }}
                   showTitle={true}
@@ -1385,12 +1481,12 @@ export default function DriverDashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-yellow-400" />
-                  Servicios e idiomas
+                  {t('servicesAndLanguages')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <Label>Servicios que ofreces</Label>
+                  <Label>{t('servicesOffered')}</Label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
                     {serviceOptionsWithIcons.map((service) => {
                       const isSelected = formData.services.includes(service.id);
@@ -1420,7 +1516,7 @@ export default function DriverDashboardPage() {
                 <Separator />
 
                 <div>
-                  <Label>Idiomas que hablas</Label>
+                  <Label>{t('languagesSpoken')}</Label>
                   <div className="flex flex-wrap gap-2 mt-2">
                     {languageOptions.map((lang) => {
                       const isSelected = formData.languages.includes(lang.id);
@@ -1453,14 +1549,14 @@ export default function DriverDashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5 text-yellow-400" />
-                  Precios y tarifas
+                  {t('prices.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Base prices */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="basePrice">Precio base (CHF)</Label>
+                    <Label htmlFor="basePrice">{t('prices.basePrice')}</Label>
                     <Input
                       id="basePrice"
                       type="number"
@@ -1470,10 +1566,10 @@ export default function DriverDashboardPage() {
                       className="mt-1.5"
                       placeholder="Ej: 5"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Tarifa inicial</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t('prices.initialRate')}</p>
                   </div>
                   <div>
-                    <Label htmlFor="pricePerKm">Precio por km (CHF)</Label>
+                    <Label htmlFor="pricePerKm">{t('prices.pricePerKm')}</Label>
                     <Input
                       id="pricePerKm"
                       type="number"
@@ -1484,10 +1580,10 @@ export default function DriverDashboardPage() {
                       className="mt-1.5"
                       placeholder="Ej: 2.50"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Por kilómetro</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t('prices.perKm')}</p>
                   </div>
                   <div>
-                    <Label htmlFor="hourlyRate">Tarifa hora (CHF)</Label>
+                    <Label htmlFor="hourlyRate">{t('prices.hourlyRate')}</Label>
                     <Input
                       id="hourlyRate"
                       type="number"
@@ -1497,7 +1593,7 @@ export default function DriverDashboardPage() {
                       className="mt-1.5"
                       placeholder="Ej: 60"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Para limusinas</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t('prices.forLimousines')}</p>
                   </div>
                 </div>
 
@@ -1505,19 +1601,19 @@ export default function DriverDashboardPage() {
                 <div className="mt-8 pt-6 border-t border-border">
                   <div className="flex items-center gap-2 mb-4">
                     <Calculator className="h-5 w-5 text-yellow-400" />
-                    <h3 className="text-lg font-semibold">Calculadora de precios</h3>
+                    <h3 className="text-lg font-semibold">{t('prices.calculator')}</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-6">
-                    Calcula cuánto ganarás según la distancia del viaje. El precio se calcula como: <strong>Precio base + (Precio por km × Distancia)</strong>
+                    {t('prices.calculatorDesc')}
                   </p>
 
                   {/* Quick Examples */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     {[
-                      { distance: 5, label: "Trayecto corto", example: "Centro ciudad" },
-                      { distance: 15, label: "Trayecto medio", example: "Pueblos cercanos" },
-                      { distance: 30, label: "Trayecto largo", example: "Ciudad vecina" },
-                      { distance: 50, label: "Larga distancia", example: "Otro cantón" },
+                      { distance: 5, label: t('prices.shortTrip'), example: t('prices.cityCenter') },
+                      { distance: 15, label: t('prices.mediumTrip'), example: t('prices.nearbyTowns') },
+                      { distance: 30, label: t('prices.longTrip'), example: t('prices.neighboringCity') },
+                      { distance: 50, label: t('prices.longDistance'), example: t('prices.anotherCanton') },
                     ].map((item) => (
                       <motion.div
                         key={item.distance}
@@ -1545,13 +1641,13 @@ export default function DriverDashboardPage() {
                   <div className="p-6 rounded-xl bg-gradient-to-br from-yellow-400/5 via-orange-400/5 to-yellow-400/5 border border-yellow-400/20">
                     <div className="flex items-center gap-2 mb-4">
                       <TrendingUp className="h-5 w-5 text-yellow-400" />
-                      <h4 className="font-semibold">Calculadora personalizada</h4>
+                      <h4 className="font-semibold">{t('prices.customCalculator')}</h4>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Distance Input */}
                       <div>
-                        <Label htmlFor="customDistance">Distancia del viaje (km)</Label>
+                        <Label htmlFor="customDistance">{t('prices.tripDistance')}</Label>
                         <div className="flex items-center gap-4 mt-2">
                           <input
                             type="range"
@@ -1572,14 +1668,14 @@ export default function DriverDashboardPage() {
                           />
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          Arrastra el slider o escribe la distancia
+                          {t('prices.sliderHint')}
                         </p>
                       </div>
 
                       {/* Price Result */}
                       <div className="flex flex-col justify-center">
                         <div className="text-center p-4 rounded-xl bg-yellow-400/10 border border-yellow-400/30">
-                          <div className="text-sm text-muted-foreground mb-1">Precio estimado</div>
+                          <div className="text-sm text-muted-foreground mb-1">{t('prices.estimatedPrice')}</div>
                           <div className="text-4xl font-bold text-yellow-400">
                             {calculatePrice(customDistance).toFixed(2)} CHF
                           </div>
@@ -1592,72 +1688,72 @@ export default function DriverDashboardPage() {
 
                     {/* Price Breakdown */}
                     <div className="mt-6 p-4 rounded-lg bg-muted/50">
-                      <h5 className="font-medium mb-3 text-sm">Desglose del precio:</h5>
+                      <h5 className="font-medium mb-3 text-sm">{t('prices.priceBreakdown')}</h5>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Precio base:</span>
+                          <span className="text-muted-foreground">{t('prices.base')}</span>
                           <span className="font-medium">{(formData.basePrice || 0).toFixed(2)} CHF</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Precio por km:</span>
+                          <span className="text-muted-foreground">{t('prices.perKmLabel')}</span>
                           <span className="font-medium">{(formData.pricePerKm || 0).toFixed(2)} CHF/km</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Distancia:</span>
+                          <span className="text-muted-foreground">{t('prices.distanceLabel')}</span>
                           <span className="font-medium">{customDistance} km</span>
                         </div>
                         <div className="border-t border-border pt-2 mt-2 flex justify-between">
-                          <span className="font-medium">Total:</span>
+                          <span className="font-medium">{t('prices.total')}</span>
                           <span className="font-bold text-yellow-400">{calculatePrice(customDistance).toFixed(2)} CHF</span>
                         </div>
                       </div>
                     </div>
-
-                    {/* Popular Routes Examples */}
-                    {(formData.basePrice || formData.pricePerKm) && (
-                      <div className="mt-6">
-                        <h5 className="font-medium mb-3 text-sm flex items-center gap-2">
-                          <Route className="h-4 w-4 text-yellow-400" />
-                          Ejemplos de rutas populares desde Suiza:
-                        </h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {[
-                            { from: "Zúrich", to: "Basilea", dist: 85 },
-                            { from: "Ginebra", to: "Lausana", dist: 62 },
-                            { from: "Bern", to: "Zúrich", dist: 125 },
-                            { from: "Zúrich", to: "Lucerna", dist: 52 },
-                            { from: "Basilea", to: "Bern", dist: 97 },
-                            { from: "Zúrich", to: "Aeropuerto", dist: 12 },
-                          ].map((route, idx) => (
-                            <div
-                              key={idx}
-                              className="p-3 rounded-lg bg-muted/30 border border-border/50 text-sm cursor-pointer hover:bg-muted/50 transition-colors"
-                              onClick={() => setCustomDistance(route.dist)}
-                            >
-                              <div className="flex items-center gap-1 text-muted-foreground mb-1">
-                                <MapPin className="h-3 w-3" />
-                                <span>{route.from} → {route.to}</span>
-                              </div>
-                              <div className="flex justify-between items-center">
-                                <span className="text-xs text-muted-foreground">{route.dist} km</span>
-                                <span className="font-bold text-yellow-400">{calculatePrice(route.dist).toFixed(2)} CHF</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Info box */}
-                  {!formData.basePrice && !formData.pricePerKm && (
-                    <div className="mt-4 p-4 rounded-lg bg-blue-400/10 border border-blue-400/30">
-                      <p className="text-sm text-blue-400">
-                        <strong>Consejo:</strong> Configura tu precio base y precio por km arriba para ver ejemplos de precios calculados automáticamente.
-                      </p>
+                  {/* Popular Routes Examples */}
+                  {(formData.basePrice || formData.pricePerKm) && (
+                    <div className="mt-6">
+                      <h5 className="font-medium mb-3 text-sm flex items-center gap-2">
+                        <Route className="h-4 w-4 text-yellow-400" />
+                        {t('prices.popularRoutes')}
+                      </h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {[
+                          { from: "Zúrich", to: "Basilea", dist: 85 },
+                          { from: "Ginebra", to: "Lausana", dist: 62 },
+                          { from: "Bern", to: "Zúrich", dist: 125 },
+                          { from: "Zúrich", to: "Lucerna", dist: 52 },
+                          { from: "Basilea", to: "Bern", dist: 97 },
+                          { from: "Zúrich", to: "Aeropuerto", dist: 12 },
+                        ].map((route, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-lg bg-muted/30 border border-border/50 text-sm cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => setCustomDistance(route.dist)}
+                          >
+                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                              <MapPin className="h-3 w-3" />
+                              <span>{route.from} → {route.to}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-xs text-muted-foreground">{route.dist} km</span>
+                              <span className="font-bold text-yellow-400">{calculatePrice(route.dist).toFixed(2)} CHF</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
+
+                {/* Info box */}
+                {!formData.basePrice && !formData.pricePerKm && (
+                  <div className="mt-4 p-4 rounded-lg bg-blue-400/10 border border-blue-400/30">
+                    <p className="text-sm text-blue-400">
+                      {t('prices.priceTip')}
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1668,7 +1764,7 @@ export default function DriverDashboardPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Clock className="h-5 w-5 text-yellow-400" />
-                  Horarios de disponibilidad
+                  {t('schedule.title')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1692,30 +1788,30 @@ export default function DriverDashboardPage() {
                     <MapPin className="h-5 w-5 text-blue-400" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-blue-400 mb-2">¿Qué son las zonas de servicio?</h3>
+                    <h3 className="font-semibold text-blue-400 mb-2">{t('zones.whatAreZones')}</h3>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Las zonas definen <strong>dónde trabajas</strong>. Cuando un cliente busca un taxi en una zona que has configurado, aparecerás en los resultados.
+                      {t('zones.zonesDesc')}
                     </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                       <div className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Cantón:</strong> Cubres todo el cantón (ej: todo Zúrich)</span>
+                        <span><strong>{t('zones.canton')}</strong> {t('zones.cantonDesc')}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Distrito:</strong> Solo una región (ej: distrito de Winterthur)</span>
+                        <span><strong>{t('zones.district')}</strong> {t('zones.districtDesc')}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Municipio:</strong> Solo una ciudad/pueblo específico</span>
+                        <span><strong>{t('zones.municipality')}</strong> {t('zones.municipalityDesc')}</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Exclusiones:</strong> Puedes excluir lugares dentro de una zona</span>
+                        <span><strong>{t('zones.exclusions')}</strong> {t('zones.exclusionsDesc')}</span>
                       </div>
                     </div>
                     <p className="text-xs text-muted-foreground mt-3">
-                      💡 <strong>Consejo:</strong> Añade varias zonas para aumentar tus oportunidades. Si trabajas en Liechtenstein, selecciona "Todo Liechtenstein" para cubrir el país entero.
+                      💡 {t('zones.zonesTip')}
                     </p>
                   </div>
                 </div>
@@ -1728,13 +1824,12 @@ export default function DriverDashboardPage() {
                 baseCity={driver.city?.name || ''} 
                 baseCanton={driver.canton?.name || ''}
                 onZonesChange={(zones) => {
-                  // Actualizar el estado de zonas - MISMO NOMBRE que en Registro
                   setServiceZonesWithExclusions(zones);
                 }}
               />
             )}
 
-            {/* Rutas con precio fijo - Componente compartido con el registro */}
+            {/* Rutas con precio fijo */}
             <div className="mt-6">
               <FixedRoutesManager
                 initialRoutes={routes}
@@ -1769,7 +1864,51 @@ export default function DriverDashboardPage() {
             />
           </TabsContent>
 
-          {/* Privacy Tab */}
+          {/* Bookings Tab */}
+          <TabsContent value="bookings">
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="h-5 w-5 text-yellow-400" />
+                  Reservas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {driver && <DashboardBookingsTab driverId={driver.id} autoExpandBookingId={autoExpandBookingId} />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Chat Tab */}
+          <TabsContent value="chat">
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageCircle className="h-5 w-5 text-yellow-400" />
+                  Chat
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {driver && <DashboardChatTab driverId={driver.id} onOpenBooking={handleOpenBooking} onUnreadCountChange={setChatUnreadCount} autoOpenConvId={activeTab === "chat" ? autoExpandBookingId : null} />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Trash Tab */}
+          <TabsContent value="trash">
+            <Card className="border-border bg-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trash2 className="h-5 w-5 text-yellow-400" />
+                  Papelera
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {driver && <DashboardTrashTab driverId={driver.id} />}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="privacy">
             <div className="space-y-6">
               {/* Data Info Card */}
@@ -1777,34 +1916,33 @@ export default function DriverDashboardPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="h-5 w-5 text-yellow-400" />
-                    Datos y Privacidad
+                    {t('privacy.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <p className="text-muted-foreground">
-                    De acuerdo con la nueva Ley Federal de Protección de Datos (nDSG) de Suiza,
-                    tienes derechos sobre tus datos personales. Aquí puedes ejercerlos.
+                    {t('privacy.nDSGDesc')}
                   </p>
 
                   {/* Data stored */}
                   <div className="bg-muted/30 rounded-lg p-4">
-                    <h4 className="font-medium mb-3">Datos que almacenamos sobre ti:</h4>
+                    <h4 className="font-medium mb-3">{t('privacy.dataStored')}</h4>
                     <ul className="text-sm text-muted-foreground space-y-2">
                       <li className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Datos de perfil:</strong> Nombre, email, teléfono, foto</span>
+                        <span><strong>{t('privacy.profileData')}</strong> {t('privacy.profileDataDesc')}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Información profesional:</strong> Experiencia, vehículo, servicios</span>
+                        <span><strong>{t('privacy.professionalData')}</strong> {t('privacy.professionalDataDesc')}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Ubicación:</strong> Última ubicación conocida (solo si GPS activo)</span>
+                        <span><strong>{t('privacy.locationData')}</strong> {t('privacy.locationDataDesc')}</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <Check className="h-4 w-4 text-green-400 mt-0.5" />
-                        <span><strong>Estadísticas:</strong> Vistas del perfil, contactos recibidos</span>
+                        <span><strong>{t('privacy.statsData')}</strong> {t('privacy.statsDataDesc')}</span>
                       </li>
                     </ul>
                   </div>
@@ -1815,10 +1953,10 @@ export default function DriverDashboardPage() {
                       <CardContent className="p-4">
                         <h4 className="font-medium mb-2 flex items-center gap-2">
                           <Eye className="h-4 w-4 text-blue-400" />
-                          Exportar mis datos
+                          {t('dataManagement.exportData')}
                         </h4>
                         <p className="text-sm text-muted-foreground mb-4">
-                          Descarga todos tus datos en formato JSON.
+                          {t('dataManagement.exportDescription')}
                         </p>
                         <Button
                           variant="outline"
@@ -1867,7 +2005,7 @@ export default function DriverDashboardPage() {
                             }
                           }}
                         >
-                          Descargar JSON
+                          {t('privacy.downloadJson')}
                         </Button>
                       </CardContent>
                     </Card>
@@ -1877,17 +2015,17 @@ export default function DriverDashboardPage() {
                       <CardContent className="p-4">
                         <h4 className="font-medium mb-2 flex items-center gap-2">
                           <FileText className="h-4 w-4 text-purple-400" />
-                          Solicitar acceso
+                          {t('privacy.requestAccess')}
                         </h4>
                         <p className="text-sm text-muted-foreground mb-4">
-                          Solicita información detallada sobre el tratamiento de tus datos.
+                          {t('privacy.requestAccessDesc')}
                         </p>
                         <a href="mailto:privacidad@eitaxi.ch?subject=Solicitud de acceso a datos - eitaxi">
                           <Button
                             variant="outline"
                             className="w-full border-purple-400 text-purple-400 hover:bg-purple-400/10"
                           >
-                            Enviar solicitud
+                            {t('privacy.sendRequest')}
                           </Button>
                         </a>
                       </CardContent>
@@ -1901,17 +2039,17 @@ export default function DriverDashboardPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Key className="h-5 w-5 text-yellow-400" />
-                    Seguridad de la cuenta
+                    {t('security.accountSecurity')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">
-                        Email actual: <span className="text-foreground font-medium">{driver?.email}</span>
+                        {t('security.currentEmail')} <span className="text-foreground font-medium">{driver?.email}</span>
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Puedes cambiar tu email o contraseña cuando quieras
+                        {t('security.changeCredentials')}
                       </p>
                     </div>
                     <Button
@@ -1920,7 +2058,7 @@ export default function DriverDashboardPage() {
                       className="border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10"
                     >
                       <Key className="h-4 w-4 mr-2" />
-                      {showSecurityForm ? "Cancelar" : "Cambiar credenciales"}
+                      {showSecurityForm ? tCommon('cancel') : t('security.changeCredentials')}
                     </Button>
                   </div>
 
@@ -1938,7 +2076,7 @@ export default function DriverDashboardPage() {
                           <div>
                             <Label htmlFor="newEmail" className="flex items-center gap-2">
                               <Mail className="h-4 w-4" />
-                              Nuevo email (dejar vacío para no cambiar)
+                              {t('security.newEmailHint')}
                             </Label>
                             <Input
                               id="newEmail"
@@ -1954,7 +2092,7 @@ export default function DriverDashboardPage() {
                           <div>
                             <Label htmlFor="currentPassword" className="flex items-center gap-2">
                               <Lock className="h-4 w-4" />
-                              Contraseña actual *
+                              {t('security.currentPassword')} *
                             </Label>
                             <Input
                               id="currentPassword"
@@ -1965,7 +2103,7 @@ export default function DriverDashboardPage() {
                               className="mt-1.5"
                             />
                             <p className="text-xs text-muted-foreground mt-1">
-                              Necesaria para verificar tu identidad
+                              {t('security.passwordRequiredHint')}
                             </p>
                           </div>
 
@@ -1973,7 +2111,7 @@ export default function DriverDashboardPage() {
                           <div>
                             <Label htmlFor="newPassword" className="flex items-center gap-2">
                               <Key className="h-4 w-4" />
-                              Nueva contraseña (dejar vacío para no cambiar)
+                              {t('security.newPasswordHint')}
                             </Label>
                             <Input
                               id="newPassword"
@@ -1991,7 +2129,7 @@ export default function DriverDashboardPage() {
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: "auto" }}
                             >
-                              <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
+                              <Label htmlFor="confirmPassword">{t('security.confirmNewPassword')}</Label>
                               <Input
                                 id="confirmPassword"
                                 type="password"
@@ -2017,7 +2155,7 @@ export default function DriverDashboardPage() {
                                 });
                               }}
                             >
-                              Cancelar
+                              {tCommon('cancel')}
                             </Button>
                             <Button
                               className="bg-yellow-400 text-black hover:bg-yellow-500"
@@ -2027,12 +2165,12 @@ export default function DriverDashboardPage() {
                               {securityLoading ? (
                                 <>
                                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Guardando...
+                                  {t('saving')}
                                 </>
                               ) : (
                                 <>
                                   <Save className="h-4 w-4 mr-2" />
-                                  Guardar cambios
+                                  {t('saveChanges')}
                                 </>
                               )}
                             </Button>
@@ -2049,26 +2187,26 @@ export default function DriverDashboardPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-red-400">
                     <AlertTriangle className="h-5 w-5" />
-                    Zona de peligro
+                    {t('privacy.dangerZone')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                    <h4 className="font-medium text-red-400 mb-2">Eliminar mi cuenta y datos</h4>
+                    <h4 className="font-medium text-red-400 mb-2">{t('dataManagement.deleteAccount')}</h4>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Esta acción es irreversible. Al solicitar la eliminación de tu cuenta:
+                      {t('privacy.deleteAccountDesc')}
                     </p>
                     <ul className="text-sm text-muted-foreground space-y-1 mb-4">
-                      <li>• Tu perfil público será eliminado inmediatamente</li>
-                      <li>• Todos tus datos personales serán eliminados en un plazo de 30 días</li>
-                      <li>• Tu historial de ubicaciones GPS será borrado</li>
-                      <li>• Ya no podrás acceder a tu panel de control</li>
+                      <li>• {t('privacy.deleteBullet1')}</li>
+                      <li>• {t('privacy.deleteBullet2')}</li>
+                      <li>• {t('privacy.deleteBullet3')}</li>
+                      <li>• {t('privacy.deleteBullet4')}</li>
                     </ul>
                     <Button
                       variant="destructive"
                       className="w-full sm:w-auto"
                       onClick={() => {
-                        if (confirm('¿Estás seguro de que deseas solicitar la eliminación de tu cuenta? Esta acción no se puede deshacer.')) {
+                        if (confirm(t('dataManagement.deleteConfirm'))) {
                           const subject = encodeURIComponent('Solicitud de eliminación de cuenta y datos');
                           const body = encodeURIComponent(`Hola,
 
@@ -2091,13 +2229,12 @@ ${driver?.name || ''}`);
                       }}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Solicitar eliminación de mi cuenta
+                      {t('privacy.requestDeleteAccount')}
                     </Button>
                   </div>
 
                   <p className="text-xs text-muted-foreground">
-                    Conforme al artículo 32 de la nDSG, procesaremos tu solicitud en un plazo máximo
-                    de 30 días. Recibirás confirmación por email.
+                    {t('privacy.nDSGArticle')}
                   </p>
                 </CardContent>
               </Card>
@@ -2107,10 +2244,10 @@ ${driver?.name || ''}`);
                 <CardContent className="p-4">
                   <h4 className="font-medium mb-2 flex items-center gap-2">
                     <MessageCircle className="h-4 w-4 text-yellow-400" />
-                    ¿Tienes preguntas sobre tus datos?
+                    {t('privacy.dataQuestions')}
                   </h4>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Contacta con nuestro Delegado de Protección de Datos:
+                    {t('privacy.dataQuestionsDesc')}
                   </p>
                   <a
                     href="mailto:privacidad@eitaxi.ch"
@@ -2119,9 +2256,7 @@ ${driver?.name || ''}`);
                     privacidad@eitaxi.ch
                   </a>
                   <p className="text-xs text-muted-foreground mt-3">
-                    También puedes presentar una reclamación ante el Comisionado Federal de
-                    Protección de Datos (PFPD) de Suiza si consideras que tus derechos no
-                    están siendo respetados.
+                    {t('privacy.complaintText')}
                   </p>
                 </CardContent>
               </Card>
@@ -2140,12 +2275,12 @@ ${driver?.name || ''}`);
             {saving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
+                {t('saving')}
               </>
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Guardar cambios
+                {t('saveChanges')}
               </>
             )}
           </Button>

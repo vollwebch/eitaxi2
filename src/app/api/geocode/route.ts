@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       addressdetails: '1',
       limit: limit.toString(),
       countrycodes,
-      'accept-language': 'de,en'
+      'accept-language': 'en'
     })
 
     // Si hay cantón, agregarlo a la búsqueda para priorizar resultados

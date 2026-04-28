@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { 
   Navigation, 
   Power, 
@@ -18,6 +19,8 @@ import {
   Home,
   Settings,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   subscribeToGPS,
   broadcastGPSState,
@@ -26,6 +29,9 @@ import {
 } from "@/lib/gpsSync";
 
 export default function DedicatedGPSPage() {
+  const tGps = useTranslations('gps');
+  const tCommon = useTranslations('common');
+
   const [gpsActive, setGpsActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,34 +116,10 @@ export default function DedicatedGPSPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [gpsActive, requestWakeLock]);
 
-  // Auto-check and start GPS
-  const checkAndStartGPSTracking = useCallback(async (id: string) => {
-    try {
-      const res = await fetch(`/api/driver/tracking?driverId=${id}`);
-      const data = await res.json();
-      
-      if (data.success && data.tracking?.enabled) {
-        console.log('GPS está activado en BD, iniciando automáticamente...');
-        
-        // Auto-guardar consentimiento si no existe
-        const savedConsent = localStorage.getItem('gps-tracking-consent');
-        if (savedConsent !== 'true') {
-          localStorage.setItem('gps-tracking-consent', 'true');
-        }
-        setHasGpsConsent(true);
-        
-        // Iniciar directamente
-        startTrackingInternal(id);
-      }
-    } catch (err) {
-      console.error('Error checking GPS status:', err);
-    }
-  }, []);
-
-  // Start tracking
+  // Start tracking (declared before checkAndStartGPSTracking to avoid reference-before-init)
   const startTrackingInternal = useCallback(async (id: string) => {
     if (!navigator.geolocation) {
-      setError('GPS no disponible en este dispositivo');
+      setError(tGps('permission.unsupported'));
       return;
     }
     
@@ -181,7 +163,7 @@ export default function DedicatedGPSPage() {
         }
       },
       (err) => {
-        setError('Error GPS: ' + err.message);
+        setError(tGps('error') + ': ' + err.message);
         setTransmitting(false);
       },
       {
@@ -195,7 +177,31 @@ export default function DedicatedGPSPage() {
     if ('setAppBadge' in navigator) {
       (navigator as any).setAppBadge(1);
     }
-  }, [requestWakeLock]);
+  }, [requestWakeLock, tGps]);
+
+  // Auto-check and start GPS
+  const checkAndStartGPSTracking = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/driver/tracking?driverId=${id}`);
+      const data = await res.json();
+      
+      if (data.success && data.tracking?.enabled) {
+        console.log('GPS está activado en BD, iniciando automáticamente...');
+        
+        // Auto-guardar consentimiento si no existe
+        const savedConsent = localStorage.getItem('gps-tracking-consent');
+        if (savedConsent !== 'true') {
+          localStorage.setItem('gps-tracking-consent', 'true');
+        }
+        setHasGpsConsent(true);
+        
+        // Iniciar directamente
+        startTrackingInternal(id);
+      }
+    } catch (err) {
+      console.error('Error checking GPS status:', err);
+    }
+  }, [startTrackingInternal]);
 
   // Stop tracking
   const stopTrackingInternal = useCallback(async () => {
@@ -239,7 +245,7 @@ export default function DedicatedGPSPage() {
   // Start tracking wrapper
   const startTracking = useCallback(async () => {
     if (!driverId) {
-      setError('No hay conductor configurado');
+      setError(tGps('noDriverConfigured'));
       return;
     }
     isLocalChangeRef.current = true;
@@ -251,7 +257,7 @@ export default function DedicatedGPSPage() {
       lastUpdate: null,
       driverId,
     });
-  }, [driverId, startTrackingInternal]);
+  }, [driverId, startTrackingInternal, tGps]);
 
   // Toggle GPS
   const toggleGPS = useCallback(async () => {
@@ -347,7 +353,7 @@ export default function DedicatedGPSPage() {
 
   // Setup driver ID
   const setupDriver = () => {
-    const id = prompt('Introduce tu ID de conductor:');
+    const id = prompt(tGps('setupDriverPrompt'));
     if (id) {
       setDriverId(id);
       localStorage.setItem('widget-driverId', id);
@@ -365,19 +371,22 @@ export default function DedicatedGPSPage() {
   if (!driverId) {
     return (
       <div className="min-h-screen bg-background p-6 flex flex-col items-center justify-center">
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcher />
+        </div>
         <div className="text-center max-w-sm">
           <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center">
             <Navigation className="h-12 w-12 text-black" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">eitaxi GPS</h1>
+          <Link href="/" className="text-3xl font-bold mb-2 inline-block">eitaxi {tGps('title')}</Link>
           <p className="text-muted-foreground mb-8">
-            Introduce tu ID de conductor para empezar
+            {tGps('setupDriverDescription')}
           </p>
           <button
             onClick={setupDriver}
             className="w-full py-4 bg-yellow-400 text-black font-bold rounded-2xl text-lg"
           >
-            Configurar
+            {tGps('setup')}
           </button>
         </div>
       </div>
@@ -386,6 +395,11 @@ export default function DedicatedGPSPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Language Switcher */}
+      <div className="absolute top-4 right-4 z-40">
+        <LanguageSwitcher />
+      </div>
+
       {/* GPS Consent Dialog */}
       <AnimatePresence>
         {showGpsConsent && (
@@ -406,8 +420,8 @@ export default function DedicatedGPSPage() {
                   <Navigation className="h-8 w-8 text-yellow-400" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-xl">Activar GPS</h3>
-                  <p className="text-sm text-muted-foreground">Permiso de ubicación</p>
+                  <h3 className="font-bold text-xl">{tGps('consent.title')}</h3>
+                  <p className="text-sm text-muted-foreground">{tGps('consent.permissionLabel')}</p>
                 </div>
               </div>
               
@@ -416,15 +430,15 @@ export default function DedicatedGPSPage() {
                   <ul className="text-sm space-y-3">
                     <li className="flex items-start gap-3">
                       <Eye className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" />
-                      <span>Los clientes te verán en el mapa en tiempo real</span>
+                      <span>{tGps('consent.clientTracking')}</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <Sun className="h-5 w-5 text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <span>La pantalla se mantendrá encendida</span>
+                      <span>{tGps('consent.screenWake')}</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <EyeOff className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                      <span>Desactívalo cuando quieras</span>
+                      <span>{tGps('consent.deactivate')}</span>
                     </li>
                   </ul>
                 </div>
@@ -433,7 +447,7 @@ export default function DedicatedGPSPage() {
                   <div className="flex items-start gap-2">
                     <Shield className="h-4 w-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                     <p className="text-xs text-muted-foreground">
-                      Tu ubicación solo se muestra a clientes. No compartimos tus datos.
+                      {tGps('consent.privacy')}
                     </p>
                   </div>
                 </div>
@@ -444,13 +458,13 @@ export default function DedicatedGPSPage() {
                   className="flex-1 py-3 border border-border rounded-xl font-medium"
                   onClick={() => setShowGpsConsent(false)}
                 >
-                  Cancelar
+                  {tCommon('cancel')}
                 </button>
                 <button
                   className="flex-1 py-3 bg-green-500 text-white rounded-xl font-bold"
                   onClick={acceptGpsConsent}
                 >
-                  Activar GPS
+                  {tGps('activate')}
                 </button>
               </div>
             </motion.div>
@@ -494,15 +508,15 @@ export default function DedicatedGPSPage() {
             {gpsActive ? (
               <>
                 <Navigation className="h-20 w-20 mx-auto mb-3 animate-pulse" />
-                <span className="text-3xl font-bold block">GPS ON</span>
+                <span className="text-3xl font-bold block">{tGps('on')}</span>
                 {transmitting && (
-                  <span className="text-sm opacity-80 mt-1 block">Transmitiendo</span>
+                  <span className="text-sm opacity-80 mt-1 block">{tGps('transmitting')}</span>
                 )}
               </>
             ) : (
               <>
                 <Power className="h-20 w-20 mx-auto mb-3" />
-                <span className="text-3xl font-bold block">GPS OFF</span>
+                <span className="text-3xl font-bold block">{tGps('off')}</span>
               </>
             )}
           </div>
@@ -516,7 +530,7 @@ export default function DedicatedGPSPage() {
               : 'bg-red-500/20 text-red-400 border border-red-500/30'
           }`}>
             <div className={`w-2.5 h-2.5 rounded-full ${gpsActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            {gpsActive ? 'Transmitiendo ubicación' : 'Sin transmitir'}
+            {gpsActive ? tGps('transmittingLocation') : tGps('notTransmitting')}
           </div>
           
           {currentPosition && (
@@ -540,7 +554,7 @@ export default function DedicatedGPSPage() {
         {gpsActive && (
           <div className="mt-6 flex items-center gap-2 text-yellow-400">
             <Sun className="h-5 w-5" />
-            <span className="text-sm font-medium">Pantalla encendida</span>
+            <span className="text-sm font-medium">{tGps('screenOn')}</span>
           </div>
         )}
 
@@ -563,7 +577,7 @@ export default function DedicatedGPSPage() {
       {/* Bottom info */}
       <div className="p-6 text-center">
         <p className="text-xs text-muted-foreground mb-4">
-          El GPS se inicia automáticamente cuando está activado
+          {tGps('autoStart')}
         </p>
         <div className="flex gap-3 text-sm justify-center">
           <a
@@ -578,7 +592,7 @@ export default function DedicatedGPSPage() {
             className="px-4 py-2 bg-muted text-muted-foreground rounded-lg flex items-center gap-2"
           >
             <Settings className="h-4 w-4" />
-            Cambiar ID
+            {tGps('changeId')}
           </button>
         </div>
       </div>

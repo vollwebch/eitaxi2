@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { verifyClientSessionToken, CLIENT_SESSION_COOKIE_NAME as CLIENT_COOKIE_NAME } from '@/lib/client-auth';
+import { verifyClientSessionToken, CLIENT_SESSION_COOKIE as CLIENT_COOKIE_NAME } from '@/lib/client-auth';
 
 export async function POST(request: NextRequest) {
   try {

@@ -60,9 +60,25 @@ interface RouteMapProps {
   geometry?: string;
   origin: { lat: number; lon: number };
   destination: { lat: number; lon: number };
+  stops?: Array<{ lat: number; lon: number }>;
 }
 
-export default function RouteMap({ geometry, origin, destination }: RouteMapProps) {
+// Create stop icon with a label
+function createStopIcon(label: string, color: string): L.DivIcon {
+  return L.divIcon({
+    html: `<div style="background: ${color}; width: 24px; height: 24px; border-radius: 50%; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center;"><span style="color: white; font-size: 11px; font-weight: bold;">${label}</span></div>`,
+    className: 'custom-marker',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
+const stopIcon = createStopIcon('1', '#3b82f6');
+const stop2Icon = createStopIcon('2', '#8b5cf6');
+const stop3Icon = createStopIcon('3', '#f97316');
+const stopIcons = [stopIcon, stop2Icon, stop3Icon];
+
+export default function RouteMap({ geometry, origin, destination, stops = [] }: RouteMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -98,6 +114,15 @@ export default function RouteMap({ geometry, origin, destination }: RouteMapProp
       .addTo(map)
       .bindPopup('<strong>Origen</strong>');
     markersRef.current.push(originMarker);
+
+    // Añadir marcadores de paradas intermedias
+    stops.forEach((stop, index) => {
+      const icon = stopIcons[index] || stopIcon;
+      const marker = L.marker([stop.lat, stop.lon], { icon })
+        .addTo(map)
+        .bindPopup(`<strong>Parada ${index + 1}</strong>`);
+      markersRef.current.push(marker);
+    });
 
     // Añadir marcador de destino
     const destMarker = L.marker([destination.lat, destination.lon], { icon: destIcon })
@@ -188,7 +213,7 @@ export default function RouteMap({ geometry, origin, destination }: RouteMapProp
       timeouts.forEach(t => clearTimeout(t));
     };
 
-  }, [geometry, origin, destination]);
+  }, [geometry, origin, destination, stops.map(s => `${s.lat},${s.lon}`).join(';')]);
 
   return <div ref={mapRef} className="w-full h-full" />;
 }

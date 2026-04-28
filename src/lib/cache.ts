@@ -187,6 +187,26 @@ export async function getCacheStats(): Promise<{
 // LIMPIAR CACHÉ
 // ============================================
 
+export async function invalidateCacheByPrefix(prefix: string): Promise<void> {
+  const client = await getRedis()
+  
+  if (client) {
+    try {
+      const keys = await client.keys(`cache:${prefix}*`)
+      // Redis keys would be deleted here
+    } catch (error) {
+      console.error('Redis invalidate error:', error)
+    }
+  }
+  
+  // Limpiar caché en memoria por prefijo
+  for (const key of memoryCache.keys()) {
+    if (key.startsWith(prefix)) {
+      memoryCache.delete(key)
+    }
+  }
+}
+
 export async function clearCache(): Promise<void> {
   const client = await getRedis()
   

@@ -30,7 +30,7 @@ export async function GET(request: Request) {
           r.toLowerCase().includes(origin) ||
           r.toLowerCase().includes(destination)
         )
-      }).map(driver => ({
+      }).map(({ password: _, resetToken: __, resetTokenExpires: ___, ...driver }) => ({
         ...driver,
         services: JSON.parse(driver.services as string),
         routes: JSON.parse(driver.routes as string),
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
         },
       })
 
-      const parsedDrivers = drivers.map(driver => ({
+      const parsedDrivers = drivers.map(({ password: _, resetToken: __, resetTokenExpires: ___, ...driver }) => ({
         ...driver,
         services: JSON.parse(driver.services as string),
         routes: JSON.parse(driver.routes as string),

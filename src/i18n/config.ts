@@ -1,59 +1,27 @@
 import { Pathnames, LocalePrefix } from 'next-intl/routing';
 
-export const locales = ['es', 'de', 'en', 'fr', 'it', 'pt'] as const;
+export const locales = ['es', 'de', 'fr', 'it', 'en', 'pt'] as const;
 export type Locale = (typeof locales)[number];
 
-export const defaultLocale: Locale = 'en';
+export const defaultLocale: Locale = 'es';
 
 // Mapeo de idiomas por código de país o preferencia regional
 export const localeMap: Record<string, Locale> = {
-  // Español
-  'es': 'es',
-  'es-ES': 'es',
-  'es-MX': 'es',
-  'es-AR': 'es',
-  'es-CO': 'es',
-  'es-CL': 'es',
-  'es-PE': 'es',
-  
-  // Alemán
-  'de': 'de',
-  'de-DE': 'de',
-  'de-AT': 'de',
-  'de-CH': 'de',
-  
-  // Inglés
-  'en': 'en',
-  'en-US': 'en',
-  'en-GB': 'en',
-  'en-AU': 'en',
-  'en-CA': 'en',
-  
-  // Francés
-  'fr': 'fr',
-  'fr-FR': 'fr',
-  'fr-CH': 'fr',
-  'fr-BE': 'fr',
-  'fr-CA': 'fr',
-  
-  // Italiano
-  'it': 'it',
-  'it-IT': 'it',
-  'it-CH': 'it',
-  
-  // Portugués
-  'pt': 'pt',
-  'pt-PT': 'pt',
-  'pt-BR': 'pt',
+  'es': 'es', 'es-ES': 'es', 'es-MX': 'es', 'es-AR': 'es',
+  'de': 'de', 'de-DE': 'de', 'de-AT': 'de', 'de-CH': 'de',
+  'fr': 'fr', 'fr-FR': 'fr', 'fr-CH': 'fr', 'fr-BE': 'fr',
+  'it': 'it', 'it-IT': 'it', 'it-CH': 'it',
+  'en': 'en', 'en-GB': 'en', 'en-US': 'en', 'en-CH': 'en',
+  'pt': 'pt', 'pt-PT': 'pt', 'pt-BR': 'pt',
 };
 
 // Nombres de idiomas en su propio idioma
 export const localeNames: Record<Locale, string> = {
   es: 'Español',
   de: 'Deutsch',
-  en: 'English',
   fr: 'Français',
   it: 'Italiano',
+  en: 'English',
   pt: 'Português',
 };
 
@@ -61,9 +29,9 @@ export const localeNames: Record<Locale, string> = {
 export const localeFlags: Record<Locale, string> = {
   es: '🇪🇸',
   de: '🇩🇪',
-  en: '🇬🇧',
   fr: '🇫🇷',
   it: '🇮🇹',
+  en: '🇬🇧',
   pt: '🇵🇹',
 };
 
@@ -71,4 +39,4 @@ export const pathnames: Pathnames<typeof locales> = {
   '/': '/',
 };
 
-export const localePrefix: LocalePrefix<typeof locales> = 'as-needed' as LocalePrefix<typeof locales>;
+export const localePrefix: LocalePrefix<typeof locales> = 'never' as LocalePrefix<typeof locales>;

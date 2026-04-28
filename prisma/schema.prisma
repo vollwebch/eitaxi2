@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -119,6 +119,8 @@ model TaxiDriver {
   trackingMode        String              @default("always")
   trackingSchedule    String              @default("[]")
   lastLocationAt      DateTime?
+  resetToken          String?
+  resetTokenExpires   DateTime?
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   locations           DriverLocation[]
@@ -130,6 +132,70 @@ model TaxiDriver {
   canton              Canton              @relation(fields: [cantonId], references: [id])
   vehicles            Vehicle[]
   bookings            Booking[]
+  clientFavorites     ClientFavorite[]
+  notifications       DriverNotification[]
+  directConversations DirectConversation[] @relation("DriverDirectConversations")
+}
+
+model Client {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  phone     String?
+  password  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  bookings  Booking[]
+  favorites ClientFavorite[]
+  notifications ClientNotification[]
+  addresses        ClientAddress[]
+  emergencyContacts EmergencyContact[]
+  sosAlerts        SOSAlert[]
+  directConversations DirectConversation[] @relation("ClientDirectConversations")
+}
+
+model Booking {
+  id            String    @id @default(cuid())
+  reference     String    @unique
+  status        String    @default("pending")
+
+  customerName  String
+  customerPhone String
+  passengerCount Int      @default(1)
+
+  pickupAddress String
+  dropoffAddress String?
+  scheduledDate String?
+  scheduledTime String?
+  notes         String?
+  estimatedPrice Float?
+
+  driverId      String
+  driver        TaxiDriver @relation(fields: [driverId], references: [id])
+  clientId      String?
+  client        Client?    @relation(fields: [clientId], references: [id])
+  messages      Message[]
+  stops         BookingStop[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([clientId])
+  @@index([driverId, deletedAt])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  bookingId   String
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender      String   // "driver" or "customer"
+  content     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([bookingId])
+  @@index([createdAt])
 }
 
 model DriverLocation {
@@ -246,104 +312,147 @@ model Vehicle {
   @@index([vehicleType])
 }
 
-model Client {
-  id              String       @id @default(cuid())
-  name            String
-  email           String       @unique
-  password        String
-  phone           String?
-  avatarUrl       String?
-  preferredLang   String       @default("es")
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  bookings        Booking[]
-  messagesSent     Message[]     @relation("SenderClient")
-  messagesReceived Message[]    @relation("ReceiverClient")
-  notifications   Notification[]
-  pushSubscriptions ClientPushSubscription[]
-}
+model ClientFavorite {
+  id        String     @id @default(cuid())
+  clientId  String
+  driverId  String
+  createdAt DateTime   @default(now())
 
-model Booking {
-  id              String     @id @default(cuid())
-  clientId        String
-  driverId        String
-  status          String     @default("pending")
-  pickupAddress   String
-  pickupLat       Float?
-  pickupLon       Float?
-  destAddress     String?
-  destLat         Float?
-  destLon         Float?
-  scheduledFor    DateTime?
-  passengerCount  Int        @default(1)
-  price           Float?
-  notes           String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  client          Client     @relation(fields: [clientId], references: [id])
-  driver          TaxiDriver @relation(fields: [driverId], references: [id])
-  messages        Message[]
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
+  @@unique([clientId, driverId])
   @@index([clientId])
-  @@index([driverId])
-  @@index([status])
 }
 
-model Message {
-  id          String     @id @default(cuid())
-  bookingId   String?
-  senderId    String
-  receiverId  String
-  senderType  String
-  content     String
-  isRead      Boolean    @default(false)
-  createdAt   DateTime   @default(now())
-  booking     Booking?   @relation(fields: [bookingId], references: [id])
-  senderClient  Client?  @relation("SenderClient", fields: [senderId], references: [id])
-  receiverClient Client? @relation("ReceiverClient", fields: [receiverId], references: [id])
+model ClientNotification {
+  id        String     @id @default(cuid())
+  clientId  String
+  type      String     // "booking_status", "new_message", "reminder"
+  title     String
+  message   String
+  link      String?    // URL to navigate when clicking the notification
+  data      String?    // JSON string for extra data
+  isRead    Boolean    @default(false)
+  bookingId String?
+  createdAt DateTime   @default(now())
 
-  @@index([bookingId])
-  @@index([senderId])
-  @@index([receiverId])
-  @@index([createdAt])
-}
-
-model Notification {
-  id          String   @id @default(cuid())
-  clientId    String
-  title       String
-  body        String
-  type        String
-  isRead      Boolean  @default(false)
-  link        String?
-  metadata    String?
-  createdAt   DateTime @default(now())
-  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
   @@index([isRead])
   @@index([createdAt])
 }
 
-model ClientPushSubscription {
+model DriverNotification {
+  id        String     @id @default(cuid())
+  driverId  String
+  type      String     // "new_booking", "new_message", "booking_status"
+  title     String
+  message   String
+  link      String?    // URL to navigate when clicking the notification
+  data      String?    // JSON string for extra data
+  isRead    Boolean    @default(false)
+  bookingId String?
+  createdAt DateTime   @default(now())
+
+  driver    TaxiDriver @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model ClientAddress {
   id        String   @id @default(cuid())
   clientId  String
-  endpoint  String
-  keysAuth  String
-  keysP256dh String
+  name      String
+  address   String
+  type      String   @default("custom") // "home", "work", "custom"
+  latitude  Float
+  longitude Float
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@index([clientId])
 }
 
-model PushSubscription {
-  id        String   @id @default(cuid())
-  driverId  String
-  endpoint  String
-  keysAuth  String
-  keysP256dh String
-  createdAt DateTime @default(now())
+model BookingStop {
+  id          String   @id @default(cuid())
+  bookingId   String
+  stopOrder   Int
+  address     String
+  latitude    Float?
+  longitude   Float?
+  createdAt   DateTime @default(now())
 
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+model EmergencyContact {
+  id        String   @id @default(cuid())
+  clientId  String
+  name      String
+  phone     String
+  relation  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+}
+
+model SOSAlert {
+  id            String   @id @default(cuid())
+  clientId      String
+  latitude      Float?
+  longitude     Float?
+  message       String?
+  status        String   @default("active") // "active", "resolved"
+  trackingToken String?  @unique
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([status])
+  @@index([trackingToken])
+}
+
+model DirectConversation {
+  id               String           @id @default(cuid())
+  clientId         String
+  driverId         String
+  lastMessage      String?
+  lastMessageAt    DateTime?
+  driverDeletedAt  DateTime?
+  clientDeletedAt  DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  client           Client           @relation("ClientDirectConversations", fields: [clientId], references: [id])
+  driver           TaxiDriver       @relation("DriverDirectConversations", fields: [driverId], references: [id])
+  messages         DirectMessage[]
+
+  @@unique([clientId, driverId])
+  @@index([clientId])
   @@index([driverId])
+}
+
+model DirectMessage {
+  id             String              @id @default(cuid())
+  conversationId String
+  sender         String              // "client" or "driver"
+  content        String
+  isRead         Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  conversation   DirectConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }

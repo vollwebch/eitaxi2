@@ -159,6 +159,67 @@ export async function GET(
   }
 }
 
+// DELETE - Eliminar ubicaciones del conductor (con verificación de propiedad)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    let session
+    try {
+      session = await requireAuth(request)
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'No autenticado' },
+        { status: 401 }
+      )
+    }
+
+    const { id: driverId } = await params
+
+    if (!driverId) {
+      return NextResponse.json({
+        success: false,
+        error: 'ID del conductor requerido'
+      }, { status: 400 })
+    }
+
+    // Verify ownership: location must belong to the authenticated driver
+    const location = await db.driverLocation.findFirst({
+      where: { driverId }
+    })
+    if (location && location.driverId !== session.driverId) {
+      return NextResponse.json(
+        { success: false, error: 'Acceso no autorizado' },
+        { status: 403 }
+      )
+    }
+
+    // Delete all locations for this driver
+    await db.driverLocation.deleteMany({
+      where: { driverId }
+    })
+
+    // Clear lastLocationAt on the driver record
+    await db.taxiDriver.update({
+      where: { id: driverId },
+      data: { lastLocationAt: null }
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Ubicaciones eliminadas'
+    })
+
+  } catch (error) {
+    console.error('Error clearing locations:', error)
+    return NextResponse.json({
+      success: false,
+      error: 'Error al eliminar ubicaciones'
+    }, { status: 500 })
+  }
+}
+
 // Verificar si está dentro del horario
 function checkSchedule(mode: string, scheduleJson: string): boolean {
   if (mode === 'always') return true

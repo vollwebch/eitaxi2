@@ -98,21 +98,10 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { driverId, enabled, mode, schedule } = body
+    const { enabled, mode, schedule } = body
 
-    if (body.driverId && body.driverId !== session.driverId) {
-      return NextResponse.json(
-        { success: false, error: 'Acceso no autorizado' },
-        { status: 403 }
-      )
-    }
-
-    if (!driverId) {
-      return NextResponse.json({
-        success: false,
-        error: 'driverId requerido'
-      }, { status: 400 })
-    }
+    // Force ownership: always use session.driverId, ignore body.driverId
+    const driverId = session.driverId
 
     // Validar mode
     if (mode && !['always', 'schedule'].includes(mode)) {

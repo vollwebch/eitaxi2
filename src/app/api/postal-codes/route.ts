@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { requireAuth } from '@/lib/auth'
 
 // API gratuita de Zippopotam para códigos postales suizos
 async function fetchPostalCode(postalCode: string) {
@@ -62,6 +63,12 @@ async function savePlace(place: any, postalCode: string) {
 }
 
 export async function POST(request: Request) {
+  try {
+    await requireAuth(request)
+  } catch {
+    return NextResponse.json({ success: false, error: 'No autenticado' }, { status: 401 })
+  }
+
   try {
     const body = await request.json()
     const { startCode, endCode } = body

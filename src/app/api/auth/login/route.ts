@@ -3,6 +3,15 @@ import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 import { createSessionToken, sessionCookieOptions } from '@/lib/auth'
 
+/** Safely parse JSON strings – returns fallback on malformed input */
+function safeJsonParse<T>(value: unknown, fallback: T): T {
+  try {
+    return JSON.parse(value as string) as T
+  } catch {
+    return fallback
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -50,18 +59,18 @@ export async function POST(request: NextRequest) {
       name: driver.name,
     })
 
-    // Return driver data (without password) + cookie segura
-    const { password: _, ...driverWithoutPassword } = driver
+    // Return driver data (without password or reset tokens) + cookie segura
+    const { password: _, resetToken: __, resetTokenExpires: ___, ...driverWithoutPassword } = driver
 
     const response = NextResponse.json({
       success: true,
       data: {
         ...driverWithoutPassword,
-        services: JSON.parse(driver.services as string),
-        routes: JSON.parse(driver.routes as string),
-        languages: JSON.parse(driver.languages as string),
-        serviceZones: JSON.parse(driver.serviceZones as string),
-        workingHours: driver.workingHours ? JSON.parse(driver.workingHours as string) : null,
+        services: safeJsonParse(driver.services, []),
+        routes: safeJsonParse(driver.routes, []),
+        languages: safeJsonParse(driver.languages, []),
+        serviceZones: safeJsonParse(driver.serviceZones, []),
+        workingHours: driver.workingHours ? safeJsonParse(driver.workingHours, null) : null,
       },
       profileUrl: `/${driver.canton.slug}/${driver.city.slug}/${driver.slug}`,
     })

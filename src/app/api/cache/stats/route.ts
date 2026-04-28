@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server'
 import { getCacheStats } from '@/lib/cache'
+import { requireAuth } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(request: Request) {
+  try {
+    await requireAuth(request)
+  } catch {
+    return NextResponse.json({ success: false, error: 'No autenticado' }, { status: 401 })
+  }
+
   try {
     const stats = await getCacheStats()
-    const redisConfigured = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+    const hasPersistentCache = stats.type === 'redis'
 
     return NextResponse.json({
       success: true,
       cache: {
         type: stats.type,
         size: stats.size,
-        redisConfigured,
-        mode: stats.type === 'memory' ? 'Memoria (se pierde al reiniciar)' : 'Redis (persistente)'
+        persistent: hasPersistentCache,
+        mode: stats.type === 'memory' ? 'Memoria (se pierde al reiniciar)' : 'Persistente'
       }
     })
   } catch (error) {

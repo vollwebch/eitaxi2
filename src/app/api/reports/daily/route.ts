@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { sendEmail } from '@/lib/email'
+import { sendDailyReportEmail as sendEmail } from '@/lib/email'
 
 /**
  * GET /api/reports/daily?driverId=xxx&date=2024-01-01&secret=xxx&send=true

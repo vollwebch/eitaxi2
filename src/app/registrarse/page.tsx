@@ -68,6 +68,7 @@ import ScheduleSelector, { DaySchedule, TimeSlot } from "@/components/ScheduleSe
 import PlaceSearch, { PlaceResult } from "@/components/PlaceSearch";
 import VehicleManager, { Vehicle } from "@/components/VehicleManager";
 import FixedRoutesManager, { FixedRoute } from "@/components/FixedRoutesManager";
+import { useTranslations } from 'next-intl';
 
 // Service icons mapping (for registration UI) - same as dashboard
 const SERVICE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -112,48 +113,44 @@ interface DriverRoute {
   price?: number;
 }
 
-// Step config - now 8 steps
-const steps = [
-  { id: 1, title: "Datos básicos", description: "Tu información" },
-  { id: 2, title: "Ubicación", description: "Dónde operas" },
-  { id: 3, title: "Vehículo", description: "Tu vehículo" },
-  { id: 4, title: "Servicios", description: "Qué ofreces" },
-  { id: 5, title: "Rutas y precios", description: "Tus tarifas" },
-  { id: 6, title: "Horarios", description: "Disponibilidad" },
-  { id: 7, title: "Descripción", description: "Sobre ti" },
-  { id: 8, title: "Vista previa", description: "Confirmar" },
-];
-
-// 🔍 MAPA DE VALIDACIÓN: Campo -> Paso y mensaje de error
-const FIELD_TO_STEP_MAP: Record<string, { step: number; label: string; fieldLabel: string }> = {
-  // Step 1: Datos básicos
-  name: { step: 1, label: "Datos básicos", fieldLabel: "Nombre completo" },
-  phone: { step: 1, label: "Datos básicos", fieldLabel: "Teléfono" },
-  email: { step: 1, label: "Datos básicos", fieldLabel: "Email" },
-  password: { step: 1, label: "Datos básicos", fieldLabel: "Contraseña" },
-  confirmPassword: { step: 1, label: "Datos básicos", fieldLabel: "Confirmar contraseña" },
-  passwordLength: { step: 1, label: "Datos básicos", fieldLabel: "Contraseña (mínimo 8 caracteres)" },
-  passwordMatch: { step: 1, label: "Datos básicos", fieldLabel: "Las contraseñas no coinciden" },
-  // Step 2: Ubicación
-  cantonId: { step: 2, label: "Ubicación", fieldLabel: "Cantón" },
-  cityId: { step: 2, label: "Ubicación", fieldLabel: "Ciudad" },
-  baseCanton: { step: 2, label: "Ubicación", fieldLabel: "Cantón base" },
-  baseCity: { step: 2, label: "Ubicación", fieldLabel: "Ciudad base" },
-  // Step 3: Vehículo
-  vehicleTypes: { step: 3, label: "Vehículo", fieldLabel: "Tipo de vehículo" },
-  vehicleType: { step: 3, label: "Vehículo", fieldLabel: "Tipo de vehículo" },
-  // Step 4: Servicios
-  services: { step: 4, label: "Servicios", fieldLabel: "Servicios ofrecidos" },
-  // Step 5: Rutas y precios
-  pickupZones: { step: 5, label: "Rutas y precios", fieldLabel: "Zonas de recogida" },
-  // Step 6: Horarios
-  schedules: { step: 6, label: "Horarios", fieldLabel: "Horarios de disponibilidad" },
-  // Términos
-  terms: { step: 8, label: "Vista previa", fieldLabel: "Términos de servicio" },
-  privacy: { step: 8, label: "Vista previa", fieldLabel: "Política de privacidad" },
+// Field-to-step mapping keys (constant keys, labels resolved at runtime)
+const FIELD_STEP_MAPPING: Record<string, { step: number; labelKey: string; fieldLabelKey: string }> = {
+  name: { step: 1, labelKey: 'steps.1', fieldLabelKey: 'fieldLabels.name' },
+  phone: { step: 1, labelKey: 'steps.1', fieldLabelKey: 'fieldLabels.phone' },
+  email: { step: 1, labelKey: 'steps.1', fieldLabelKey: 'fieldLabels.email' },
+  password: { step: 1, labelKey: 'steps.1', fieldLabelKey: 'fieldLabels.password' },
+  confirmPassword: { step: 1, labelKey: 'steps.1', fieldLabelKey: 'fieldLabels.confirmPassword' },
+  passwordLength: { step: 1, labelKey: 'steps.1', fieldLabelKey: 'fieldLabels.passwordLength' },
+  passwordMatch: { step: 1, labelKey: 'steps.1', fieldLabelKey: 'fieldLabels.passwordMatch' },
+  cantonId: { step: 2, labelKey: 'steps.2', fieldLabelKey: 'fieldLabels.cantonId' },
+  cityId: { step: 2, labelKey: 'steps.2', fieldLabelKey: 'fieldLabels.cityId' },
+  baseCanton: { step: 2, labelKey: 'steps.2', fieldLabelKey: 'fieldLabels.baseCanton' },
+  baseCity: { step: 2, labelKey: 'steps.2', fieldLabelKey: 'fieldLabels.baseCity' },
+  vehicleTypes: { step: 3, labelKey: 'steps.3', fieldLabelKey: 'fieldLabels.vehicleTypes' },
+  vehicleType: { step: 3, labelKey: 'steps.3', fieldLabelKey: 'fieldLabels.vehicleType' },
+  services: { step: 4, labelKey: 'steps.4', fieldLabelKey: 'fieldLabels.services' },
+  pickupZones: { step: 5, labelKey: 'steps.5', fieldLabelKey: 'fieldLabels.pickupZones' },
+  schedules: { step: 6, labelKey: 'steps.6', fieldLabelKey: 'fieldLabels.schedules' },
+  terms: { step: 8, labelKey: 'steps.8', fieldLabelKey: 'fieldLabels.terms' },
+  privacy: { step: 8, labelKey: 'steps.8', fieldLabelKey: 'fieldLabels.privacy' },
 };
 
 export default function RegistrarsePage() {
+  const t = useTranslations('register');
+  const tCommon = useTranslations('common');
+
+  // Step config - now 8 steps (inside component for t() access)
+  const steps = [
+    { id: 1, title: t('steps.1'), description: '' },
+    { id: 2, title: t('steps.2'), description: '' },
+    { id: 3, title: t('steps.3'), description: '' },
+    { id: 4, title: t('steps.4'), description: '' },
+    { id: 5, title: t('steps.5'), description: '' },
+    { id: 6, title: t('steps.6'), description: '' },
+    { id: 7, title: t('steps.7'), description: '' },
+    { id: 8, title: t('steps.8'), description: '' },
+  ];
+
   // Form state
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -262,7 +259,7 @@ export default function RegistrarsePage() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setError("La imagen no puede superar los 5MB");
+        setError("Image max 5MB");
         return;
       }
       setImageFile(file);
@@ -315,7 +312,7 @@ export default function RegistrarsePage() {
   // Generate AI description
   const generateAIDescription = async () => {
     if (!formData.name || formData.services.length === 0) {
-      setError("Por favor completa tu nombre y selecciona al menos un servicio");
+      setError(t('nameServiceRequired'));
       return;
     }
 
@@ -358,10 +355,10 @@ export default function RegistrarsePage() {
           }));
         }
       } else {
-        setError(data.error || "Error al generar descripciones");
+        setError(data.error || t('errorGenerateDescriptions'));
       }
     } catch (err) {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setIsGeneratingAI(false);
     }
@@ -381,7 +378,7 @@ export default function RegistrarsePage() {
   // Improve existing text with AI
   const improveExistingText = async () => {
     if (!formData.description || formData.description.trim().length < 10) {
-      setError("Escribe algo de texto primero para que la IA pueda mejorarlo");
+      setError(t('writeTextFirstImprove'));
       return;
     }
 
@@ -421,10 +418,10 @@ export default function RegistrarsePage() {
         setAiDescriptions({});
         setSelectedAiStyle(null);
       } else {
-        setError(data.error || "Error al mejorar el texto");
+        setError(data.error || t('errorImproveText'));
       }
     } catch (err) {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setIsGeneratingAI(false);
     }
@@ -433,7 +430,7 @@ export default function RegistrarsePage() {
   // Analyze existing text with AI
   const analyzeExistingText = async () => {
     if (!formData.description || formData.description.trim().length < 10) {
-      setError("Escribe algo de texto primero para que la IA pueda analizarlo");
+      setError(t('writeTextFirstAnalyze'));
       return;
     }
 
@@ -476,10 +473,10 @@ export default function RegistrarsePage() {
         setAiDescriptions({});
         setSelectedAiStyle(null);
       } else {
-        setError(data.error || "Error al analizar el texto");
+        setError(data.error || t('errorAnalyzeText'));
       }
     } catch (err) {
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setIsGeneratingAI(false);
     }
@@ -535,9 +532,9 @@ export default function RegistrarsePage() {
     const newErrorSteps = new Set<number>();
     
     missingFields.forEach(field => {
-      const fieldInfo = FIELD_TO_STEP_MAP[field];
+      const fieldInfo = FIELD_STEP_MAPPING[field];
       if (fieldInfo) {
-        newFieldErrors[field] = `⚠️ ${fieldInfo.fieldLabel} es obligatorio`;
+        newFieldErrors[field] = `⚠️ ${t(fieldInfo.fieldLabelKey)} ${t('validation.required')}`;
         newErrorSteps.add(fieldInfo.step);
       }
     });
@@ -587,11 +584,11 @@ export default function RegistrarsePage() {
       
       // Crear mensaje de error detallado
       const errorMessages = validation.missingFields.map(f => {
-        const info = FIELD_TO_STEP_MAP[f];
-        return info ? info.fieldLabel : f;
+        const info = FIELD_STEP_MAPPING[f];
+        return info ? t(info.fieldLabelKey) : f;
       });
       
-      setError(`Por favor completa: ${errorMessages.join(', ')}`);
+      setError(`${t('pleaseComplete')} ${errorMessages.join(', ')}`);
       setValidationErrors(validation.missingFields);
       
       // Scroll al inicio del formulario
@@ -628,8 +625,8 @@ export default function RegistrarsePage() {
       // 🔍 LOG DETALLADO DE ERRORES
       console.error('🔴 ERRORES DE VALIDACIÓN DETECTADOS:');
       fullValidation.allErrors.forEach(err => {
-        const info = FIELD_TO_STEP_MAP[err];
-        console.error(`  ❌ Paso ${info?.step || '?'}: ${info?.fieldLabel || err} es obligatorio`);
+        const info = FIELD_STEP_MAPPING[err];
+        console.error(`  ❌ Paso ${info?.step || '?'}: ${info ? t(info.fieldLabelKey) : err}`);
       });
       
       // Crear mensaje de error resumido
@@ -639,7 +636,7 @@ export default function RegistrarsePage() {
         return `Paso ${stepNum} (${step?.title || 'Desconocido'})`;
       });
       
-      setError(`Por favor, revisa: ${errorStepsLabels.join(', ')}`);
+      setError(`${t('checkPlease')} ${errorStepsLabels.join(', ')}`);
       
       // 🔴 NAVEGACIÓN AUTOMÁTICA al primer paso con error
       navigateToFirstErrorStep(fullValidation.errorSteps);
@@ -777,6 +774,12 @@ export default function RegistrarsePage() {
 
       if (data.success) {
         console.log('✅ PERFIL CREADO EXITOSAMENTE');
+        // 💾 Guardar sesión en localStorage para que AuthGuard funcione inmediatamente
+        localStorage.setItem('eitaxi_session', JSON.stringify({
+          driverId: data.data.id,
+          email: data.data.email,
+          name: data.data.name,
+        }));
         setSuccess(true);
         setProfileUrl(data.profileUrl);
         setDriverId(data.data.id);
@@ -822,42 +825,42 @@ export default function RegistrarsePage() {
           const errorSteps = new Set<number>();
           
           data.missingFields.forEach((field: string) => {
-            const info = FIELD_TO_STEP_MAP[field];
+            const info = FIELD_STEP_MAPPING[field];
             if (info) {
-              fieldErrors[field] = `${info.fieldLabel} es obligatorio`;
+              fieldErrors[field] = `${t(info.fieldLabelKey)} ${t('validation.required')}`;
               errorSteps.add(info.step);
             }
           });
           
           setFieldErrors(fieldErrors);
           setErrorSteps(errorSteps);
-          setError(`Faltan campos: ${data.missingFields.join(', ')}`);
+          setError(`${t('missingFields')} ${data.missingFields.join(', ')}`);
           
           // Navegar al primer paso con error
           navigateToFirstErrorStep(errorSteps);
         } else if (data.field) {
           // Error en campo específico
-          const info = FIELD_TO_STEP_MAP[data.field];
+          const info = FIELD_STEP_MAPPING[data.field];
           if (info) {
-            setFieldErrors({ [data.field]: data.error || 'Error en este campo' });
+            setFieldErrors({ [data.field]: data.error || t('fieldRequired') });
             setErrorSteps(new Set([info.step]));
             setCurrentStep(info.step);
           }
-          setError(data.error || "Error al crear el perfil");
+          setError(data.error || t('errorCreateProfile'));
         } else if (data.details?.field) {
           // Error de Prisma con campo específico
-          setError(`Error en el campo '${data.details.field}': ${data.error}`);
+          setError(`${data.details.field}: ${data.error}`);
         } else {
           // Mostrar el error con detalles si están disponibles
           const errorMsg = data.details?.message 
-            ? `${data.error}\n\nDetalles técnicos: ${data.details.message}`
-            : data.error || "Error al crear el perfil";
+            ? `${data.error}\n\n${data.details.message}`
+            : data.error || t('errorCreateProfile');
           setError(errorMsg);
         }
       }
     } catch (err) {
       console.error('❌ ERROR DE CONEXIÓN:', err);
-      setError("Error de conexión. Intenta de nuevo.");
+      setError(tCommon('connectionError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -884,15 +887,15 @@ export default function RegistrarsePage() {
           <div className="w-20 h-20 mx-auto mb-6 bg-green-500/20 rounded-full flex items-center justify-center">
             <Check className="w-10 h-10 text-green-500" />
           </div>
-          <h1 className="text-2xl font-bold mb-2">¡Perfil creado!</h1>
+          <h1 className="text-2xl font-bold mb-2">{t('success.title')}</h1>
           <p className="text-muted-foreground mb-6">
-            Tu perfil profesional ha sido creado exitosamente y está activo.
+            {t('success.subtitle')}
           </p>
           
           {profileUrl && (
             <Card className="mb-6 border-yellow-400/30 bg-yellow-400/5">
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground mb-2">Tu URL pública:</p>
+                <p className="text-sm text-muted-foreground mb-2">{t('yourPublicUrl')}</p>
                 <code className="block bg-background p-3 rounded text-yellow-400 text-lg font-mono break-all">
                   eitaxi.ch{profileUrl}
                 </code>
@@ -903,12 +906,12 @@ export default function RegistrarsePage() {
           {driverId && (
             <Card className="mb-6 border-blue-400/30 bg-blue-400/5">
               <CardContent className="p-4">
-                <p className="text-sm text-muted-foreground mb-2">Tu panel de control:</p>
+                <p className="text-sm text-muted-foreground mb-2">{t('yourDashboard')}</p>
                 <code className="block bg-background p-3 rounded text-blue-400 text-sm font-mono break-all">
                   eitaxi.ch/dashboard/{driverId}
                 </code>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Guarda este enlace para editar tu perfil
+                  {t('saveLinkHint')}
                 </p>
               </CardContent>
             </Card>
@@ -920,7 +923,7 @@ export default function RegistrarsePage() {
               onClick={() => window.location.href = profileUrl || "/"}
             >
               <Eye className="mr-2 h-4 w-4" />
-              Ver mi perfil
+              {t('viewProfile')}
             </Button>
             {driverId && (
               <Button 
@@ -928,11 +931,11 @@ export default function RegistrarsePage() {
                 className="w-full border-blue-400 text-blue-400 hover:bg-blue-400/10" 
                 onClick={() => window.location.href = `/dashboard/${driverId}`}
               >
-                Ir a mi panel
+                {t('goToDashboard')}
               </Button>
             )}
             <Button variant="outline" onClick={() => window.location.href = "/"}>
-              Ir al inicio
+              {t('goHome')}
             </Button>
           </div>
         </motion.div>
@@ -950,21 +953,23 @@ export default function RegistrarsePage() {
             animate={{ opacity: 1, y: 0 }}
             className="inline-flex items-center gap-2 mb-4"
           >
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-500">
-              <Car className="h-7 w-7 text-black" />
-            </div>
-            <span className="text-2xl font-bold">
-              <span className="text-yellow-400">ei</span>
-              <span className="text-white">taxi</span>
-            </span>
+            <Link href="/" className="inline-flex items-center gap-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-yellow-400 to-yellow-500">
+                <Car className="h-7 w-7 text-black" />
+              </div>
+              <span className="text-2xl font-bold">
+                <span className="text-yellow-400">ei</span>
+                <span className="text-white">taxi</span>
+              </span>
+            </Link>
           </motion.div>
-          <h1 className="text-3xl font-bold mb-2">Únete como conductor</h1>
+          <h1 className="text-3xl font-bold mb-2">{t('title')}</h1>
           <p className="text-muted-foreground">
-            Crea tu perfil profesional y conecta con miles de pasajeros en Suiza
+            {t('subtitle')}
           </p>
           <Badge variant="secondary" className="mt-2 bg-green-500/10 text-green-500 border-green-500/30">
             <Check className="mr-1 h-3 w-3" />
-            Registro gratuito - Sin pagos
+            {t('freeLabel')}
           </Badge>
         </div>
 
@@ -1014,7 +1019,7 @@ export default function RegistrarsePage() {
             <AlertDescription>
               {errorSteps.size > 1 && (
                 <div className="mb-2 font-semibold">
-                  ⚠️ Errores en {errorSteps.size} pasos:
+                  ⚠️ {t('errorsInSteps', { count: errorSteps.size })}
                 </div>
               )}
               <div className="whitespace-pre-line">{error}</div>
@@ -1027,7 +1032,7 @@ export default function RegistrarsePage() {
                     onClick={() => navigateToFirstErrorStep(errorSteps)}
                     className="border-red-500/50 text-red-400 hover:bg-red-500/10"
                   >
-                    Ir al primer error (Paso {Math.min(...Array.from(errorSteps))})
+                    {t('goToFirstError', { step: Math.min(...Array.from(errorSteps)) })}
                   </Button>
                 </div>
               )}
@@ -1051,15 +1056,15 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <User className="h-5 w-5 text-yellow-400" />
-                      Información básica
+                      {t('basicInfo')}
                     </h2>
                     
                     <div className="space-y-4">
                       <div>
-                        <Label htmlFor="name">Nombre o nombre comercial *</Label>
+                        <Label htmlFor="name">{t('fields.name')} *</Label>
                         <Input
                           id="name"
-                          placeholder="Ej: Taxi Paco, Taxi Martínez, Luis Gómez..."
+                          placeholder={t('fields.namePlaceholder')}
                           value={formData.name}
                           onChange={(e) => {
                             setFormData({ ...formData, name: e.target.value });
@@ -1080,7 +1085,7 @@ export default function RegistrarsePage() {
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="phone">Teléfono principal *</Label>
+                          <Label htmlFor="phone">{t('fields.phone')} *</Label>
                           <div className="relative mt-1.5">
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -1121,7 +1126,7 @@ export default function RegistrarsePage() {
                       </div>
 
                       <div>
-                        <Label htmlFor="email">Email * (para acceder a tu panel)</Label>
+                        <Label htmlFor="email">{t('fields.email')} * </Label>
                         <div className="relative mt-1.5">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
@@ -1136,7 +1141,7 @@ export default function RegistrarsePage() {
                               // Validar caracteres especiales en tiempo real
                               const specialChars = /[ñçáéíóúàèìòùâêîôûäëïöü]/i;
                               if (specialChars.test(value)) {
-                                setEmailCharError('Los caracteres especiales (ñ, ç, acentos) no son válidos en emails. Usa letras sin acento (ej: n en lugar de ñ)');
+                                setEmailCharError(t('emailCharError'));
                               } else {
                                 setEmailCharError(null);
                               }
@@ -1146,9 +1151,9 @@ export default function RegistrarsePage() {
                             onInvalid={(e) => {
                               const input = e.target as HTMLInputElement;
                               if (input.value && /[ñçáéíóúàèìòùâêîôûäëïöü]/i.test(input.value)) {
-                                input.setCustomValidity('Los caracteres especiales como ñ, ç, acentos no son válidos en direcciones de email. Por favor, usa solo letras sin acentos (ej: n en lugar de ñ)');
+                                input.setCustomValidity(t('emailCharError'));
                               } else {
-                                input.setCustomValidity('Por favor, introduce una dirección de email válida');
+                                input.setCustomValidity(t('emailInvalidError'));
                               }
                             }}
                             onInput={(e) => {
@@ -1164,17 +1169,17 @@ export default function RegistrarsePage() {
                             {emailCharError}
                           </p>
                         ) : validationErrors.includes('email') ? (
-                          <p className="text-xs text-red-500 mt-1">Este campo es obligatorio</p>
+                          <p className="text-xs text-red-500 mt-1">{t('fieldRequired')}</p>
                         ) : (
                           <p className="text-xs text-muted-foreground mt-1">
-                            Usarás este email para iniciar sesión en tu panel
+                            {t('emailLoginHint')}
                           </p>
                         )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="password">Contraseña * (mín. 8 caracteres)</Label>
+                          <Label htmlFor="password">{t('fields.password')} * (8 chars)</Label>
                           <div className="relative mt-1.5">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -1190,11 +1195,11 @@ export default function RegistrarsePage() {
                             />
                           </div>
                           {validationErrors.includes('password') && (
-                            <p className="text-xs text-red-500 mt-1">Mínimo 8 caracteres</p>
+                            <p className="text-xs text-red-500 mt-1">8 chars min</p>
                           )}
                         </div>
                         <div>
-                          <Label htmlFor="confirmPassword">Confirmar contraseña *</Label>
+                          <Label htmlFor="confirmPassword">{t('fields.confirmPassword')} *</Label>
                           <div className="relative mt-1.5">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -1213,7 +1218,7 @@ export default function RegistrarsePage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="experience">Años de experiencia</Label>
+                          <Label htmlFor="experience">{t('yearsExperience')}</Label>
                           <Input
                             id="experience"
                             type="number"
@@ -1247,7 +1252,7 @@ export default function RegistrarsePage() {
                       <Separator className="my-4" />
                       <h3 className="font-medium flex items-center gap-2">
                         <Globe className="h-4 w-4 text-yellow-400" />
-                        Redes sociales (opcional)
+                        {t('socialMediaOptional')}
                       </h3>
                       
                       <div className="space-y-3">
@@ -1316,10 +1321,10 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
                       <MapPin className="h-5 w-5 text-yellow-400" />
-                      Tu Ubicación Base (Sede)
+                      {t('yourBaseLocation')}
                     </h2>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Esta es tu ubicación principal. Se mostrará a los clientes cuando no tengas el GPS activo.
+                      {t('locationDescription')}
                     </p>
 
                     <div className="space-y-4">
@@ -1327,7 +1332,7 @@ export default function RegistrarsePage() {
                       <div>
                         <Label className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-muted-foreground" />
-                          Cantón *
+                          {t('fields.canton')} *
                         </Label>
                         <Select
                           value={selectedBaseCanton}
@@ -1345,7 +1350,7 @@ export default function RegistrarsePage() {
                           }}
                         >
                           <SelectTrigger className={`mt-1.5 ${validationErrors.includes('cantonId') ? 'border-red-500 ring-red-500' : ''}`}>
-                            <SelectValue placeholder="Selecciona tu cantón" />
+                            <SelectValue placeholder={t('selectCanton')} />
                           </SelectTrigger>
                           <SelectContent className="max-h-64">
                             <SelectItem value="liechtenstein">
@@ -1359,7 +1364,7 @@ export default function RegistrarsePage() {
                           </SelectContent>
                         </Select>
                         {validationErrors.includes('cantonId') && (
-                          <p className="text-xs text-red-500 mt-1">⚠️ Selecciona un cantón</p>
+                          <p className="text-xs text-red-500 mt-1">⚠️ {t('selectCantonError')}</p>
                         )}
                       </div>
 
@@ -1367,7 +1372,7 @@ export default function RegistrarsePage() {
                       <div>
                         <Label className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
-                          Ciudad / Municipio *
+                          {t('fields.city')} / *
                         </Label>
                         <Select
                           value={formData.baseCity}
@@ -1380,7 +1385,7 @@ export default function RegistrarsePage() {
                           disabled={!selectedBaseCanton}
                         >
                           <SelectTrigger className={`mt-1.5 ${validationErrors.includes('cityId') ? 'border-red-500 ring-red-500' : ''}`}>
-                            <SelectValue placeholder={selectedBaseCanton ? "Selecciona tu ciudad" : "Primero selecciona un cantón"} />
+                            <SelectValue placeholder={selectedBaseCanton ? t('selectCity') : t('selectCantonFirst')} />
                           </SelectTrigger>
                           <SelectContent className="max-h-64">
                             {availableMunicipalities.map((municipality) => (
@@ -1391,11 +1396,11 @@ export default function RegistrarsePage() {
                           </SelectContent>
                         </Select>
                         {validationErrors.includes('cityId') && (
-                          <p className="text-xs text-red-500 mt-1">⚠️ Selecciona una ciudad</p>
+                          <p className="text-xs text-red-500 mt-1">⚠️ {t('selectCityError')}</p>
                         )}
                         {selectedBaseCanton && availableMunicipalities.length > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            {availableMunicipalities.length} municipios disponibles
+                            {t('availableMunicipalities', { count: availableMunicipalities }).replace(/^\d+\s/, '')}
                           </p>
                         )}
                       </div>
@@ -1404,7 +1409,7 @@ export default function RegistrarsePage() {
                       <div>
                         <Label htmlFor="address" className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
-                          Dirección / Calle <span className="text-muted-foreground font-normal">(opcional)</span>
+                          {t('addressOptional')} <span className="text-muted-foreground font-normal">({tCommon('optional')})</span>
                         </Label>
                         <Input
                           id="address"
@@ -1416,22 +1421,21 @@ export default function RegistrarsePage() {
                           className="mt-1.5"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          Solo si quieres mostrar tu dirección exacta a los clientes
+                          {t('addressHint')}
                         </p>
                       </div>
 
                       {/* Info box */}
                       <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                         <p className="text-sm text-yellow-400">
-                          💡 <strong>Esta ubicación</strong> se usará para mostrarte en búsquedas cuando no tengas el GPS activo. 
-                          Las zonas donde operas las configurarás en el siguiente paso.
+                          💡 {t('locationHint')}
                         </p>
                       </div>
 
                       {/* Preview */}
                       {selectedBaseCanton && formData.baseCity && (
                         <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
-                          <p className="text-sm text-green-400 font-medium mb-1">✓ Tu sede:</p>
+                          <p className="text-sm text-green-400 font-medium mb-1">✓ {t('yourBase')}</p>
                           <p className="text-lg font-semibold">
                             {formData.baseCity}, {selectedBaseCanton === "liechtenstein" 
                               ? "Liechtenstein" 
@@ -1459,14 +1463,14 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <Car className="h-5 w-5 text-yellow-400" />
-                      Vehículos
+                      {t('vehicles')}
                     </h2>
 
                     {/* Error de validación */}
                     {validationErrors.includes('vehicleTypes') && (
                       <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
                         <p className="text-sm text-red-500 font-medium">
-                          ⚠️ Debes añadir al menos un vehículo
+                          ⚠️ {t('addVehicleRequired')}
                         </p>
                       </div>
                     )}
@@ -1490,17 +1494,16 @@ export default function RegistrarsePage() {
                     {/* Info box */}
                     <div className="mt-4 p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
                       <p className="text-sm text-blue-400">
-                        💡 <strong>Consejo:</strong> Puedes añadir varios vehículos si tienes una flota.
-                        El vehículo marcado como "Principal" será el que se muestre por defecto en tu perfil.
+                        💡 <strong>Tip:</strong> {t('vehicleTip')}
                       </p>
                     </div>
 
                     {/* Imagen de perfil - separada de los vehículos */}
                     <div className="mt-6">
                       <Separator className="mb-4" />
-                      <h3 className="font-medium mb-3">Foto de perfil</h3>
+                      <h3 className="font-medium mb-3">{t('profilePhoto')}</h3>
                       <p className="text-xs text-muted-foreground mb-3">
-                        Una foto profesional tuya o de tu vehículo principal (máx. 5MB)
+                        {t('profilePhotoHint')}
                       </p>
 
                       {imagePreview ? (
@@ -1527,7 +1530,7 @@ export default function RegistrarsePage() {
                         >
                           <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                           <span className="text-sm text-muted-foreground">
-                            Subir foto
+                            {t('uploadPhoto')}
                           </span>
                         </div>
                       )}
@@ -1556,18 +1559,18 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-yellow-400" />
-                      Servicios e idiomas
+                      {t('servicesAndLanguages')}
                     </h2>
 
                     <div className="space-y-6">
                       {/* Services */}
                       <div className={`p-4 rounded-lg ${validationErrors.includes('services') ? 'border-2 border-red-500 bg-red-500/5' : ''}`}>
-                        <Label>Servicios que ofreces *</Label>
+                        <Label>{t('fields.services')} *</Label>
                         <p className="text-xs text-muted-foreground mb-3">
-                          Selecciona al menos un servicio
+                          {t('selectAtLeastOneService')}
                         </p>
                         {validationErrors.includes('services') && (
-                          <p className="text-xs text-red-500 mb-2 font-medium">⚠️ Selecciona al menos un servicio</p>
+                          <p className="text-xs text-red-500 mb-2 font-medium">⚠️ {t('selectAtLeastOneService')}</p>
                         )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {serviceOptions.map((service) => {
@@ -1609,7 +1612,7 @@ export default function RegistrarsePage() {
                       <div>
                         <Label className="flex items-center gap-2">
                           <Globe className="h-4 w-4" />
-                          Idiomas que hablas
+                          {t('fields.languages')}
                         </Label>
                         <p className="text-xs text-muted-foreground mb-2">
                           Ayuda a los pasajeros a comunicarse contigo
@@ -1653,7 +1656,7 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <Globe className="h-5 w-5 text-yellow-400" />
-                      Zonas de servicio, rutas y precios
+                      {t('serviceZonesRoutes')}
                     </h2>
 
                     <div className="space-y-6">
@@ -1679,11 +1682,11 @@ export default function RegistrarsePage() {
                       <div>
                         <Label className="flex items-center gap-2">
                           <DollarSign className="h-4 w-4" />
-                          Tarifas base
+                          {t('baseRates')}
                         </Label>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
                           <div>
-                            <Label htmlFor="basePrice" className="text-xs text-muted-foreground">Precio base (CHF)</Label>
+                            <Label htmlFor="basePrice" className="text-xs text-muted-foreground">{t('basePriceLabel')}</Label>
                             <Input
                               id="basePrice"
                               type="number"
@@ -1700,7 +1703,7 @@ export default function RegistrarsePage() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="pricePerKm" className="text-xs text-muted-foreground">Precio por km (CHF)</Label>
+                            <Label htmlFor="pricePerKm" className="text-xs text-muted-foreground">{t('pricePerKmLabel')}</Label>
                             <Input
                               id="pricePerKm"
                               type="number"
@@ -1718,7 +1721,7 @@ export default function RegistrarsePage() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor="hourlyRate" className="text-xs text-muted-foreground">Tarifa hora (CHF)</Label>
+                            <Label htmlFor="hourlyRate" className="text-xs text-muted-foreground">{t('hourlyRateLabel')}</Label>
                             <Input
                               id="hourlyRate"
                               type="number"
@@ -1766,10 +1769,10 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
                       <Clock className="h-5 w-5 text-yellow-400" />
-                      Horarios de disponibilidad
+                      {t('availabilitySchedule')}
                     </h2>
                     <p className="text-sm text-muted-foreground mb-4">
-                      ¿Cuándo estás disponible para trabajar?
+                      {t('availableWhen')}
                     </p>
 
                     <div className="space-y-4">
@@ -1796,10 +1799,10 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
                       <FileText className="h-5 w-5 text-yellow-400" />
-                      Descripción de tu perfil
+                      {t('descriptionProfile')}
                     </h2>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Una buena descripción ayuda a los clientes a conocerte. Usa nuestra IA para generar opciones profesionales.
+                      {t('fields.descriptionHint')}
                     </p>
 
                     <div className="space-y-4">
@@ -1808,7 +1811,7 @@ export default function RegistrarsePage() {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <Sparkles className="h-5 w-5 text-purple-400" />
-                            <span className="font-medium text-purple-400">Generador de descripción con IA</span>
+                            <span className="font-medium text-purple-400">{t('aiGeneratorTitle')}</span>
                           </div>
                           <Button
                             type="button"
@@ -1821,18 +1824,18 @@ export default function RegistrarsePage() {
                             {isGeneratingAI ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Generando...
+                                {t('generating')}
                               </>
                             ) : (
                               <>
                                 <Wand2 className="mr-2 h-4 w-4" />
-                                {aiDescriptions && Object.keys(aiDescriptions).length > 0 ? "Regenerar" : "Generar opciones"}
+                                {aiDescriptions && Object.keys(aiDescriptions).length > 0 ? t('regenerate') : t('generateOptions')}
                               </>
                             )}
                           </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          La IA generará 3 opciones con diferentes estilos. Elige la que más te guste o edita el texto.
+                          {t('fields.descriptionHint')}
                         </p>
                       </div>
 
@@ -1935,8 +1938,8 @@ export default function RegistrarsePage() {
                                 <RefreshCw className="h-4 w-4 text-green-400" />
                               </div>
                               <div>
-                                <span className="font-medium text-green-400 text-sm">¿Ya tienes texto?</span>
-                                <span className="text-xs text-muted-foreground block">La IA puede mejorarlo manteniendo tu estilo</span>
+                                <span className="font-medium text-green-400 text-sm">{t('alreadyHaveText')}</span>
+                                <span className="text-xs text-muted-foreground block">{t('aiCanImprove')}</span>
                               </div>
                             </div>
                             <Button
@@ -1950,12 +1953,12 @@ export default function RegistrarsePage() {
                               {isGeneratingAI ? (
                                 <>
                                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Mejorando...
+                                  {t('improving')}
                                 </>
                               ) : (
                                 <>
-                                  <Wand2 className="mr-2 h-4 w-4" />
-                                  Mejorar con IA
+                                <Wand2 className="mr-2 h-4 w-4" />
+                                {t('improveWithAI')}
                                 </>
                               )}
                             </Button>
@@ -1966,7 +1969,7 @@ export default function RegistrarsePage() {
                       {/* Editable textarea */}
                       <div>
                         <Label htmlFor="description" className="flex items-center gap-2">
-                          Tu descripción
+                          {t('yourDescription')}
                           {selectedAiStyle && (
                             <Badge variant="outline" className="text-xs">
                               Estilo: {selectedAiStyle}
@@ -1974,11 +1977,11 @@ export default function RegistrarsePage() {
                           )}
                         </Label>
                         <p className="text-xs text-muted-foreground mb-2">
-                          Puedes editar el texto generado o escribir tu propia descripción
+                          {t('editGeneratedText')}
                         </p>
                         <Textarea
                           id="description"
-                          placeholder="Escribe una descripción profesional sobre tu servicio de taxi..."
+                          placeholder={t('fields.descriptionPlaceholder')}
                           value={formData.description}
                           onChange={(e) => {
                             setFormData({ ...formData, description: e.target.value });
@@ -1988,11 +1991,11 @@ export default function RegistrarsePage() {
                         />
                         <div className="flex justify-between mt-2">
                           <p className="text-xs text-muted-foreground">
-                            {formData.description.length} caracteres
+                            {formData.description.length} {t('characters')}
                           </p>
                           {formData.description.length > 500 && (
                             <p className="text-xs text-yellow-500">
-                              Recomendado: menos de 500 caracteres
+                              {t('recommendedMaxChars')}
                             </p>
                           )}
                         </div>
@@ -2014,7 +2017,7 @@ export default function RegistrarsePage() {
                   <div>
                     <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                       <Eye className="h-5 w-5 text-yellow-400" />
-                      Vista previa de tu perfil
+                      {t('profilePreview')}
                     </h2>
 
                     <div className="space-y-6">
@@ -2035,10 +2038,10 @@ export default function RegistrarsePage() {
                               </div>
                             )}
                             <div>
-                              <h3 className="text-xl font-bold">{formData.name || "Tu nombre"}</h3>
+                              <h3 className="text-xl font-bold">{formData.name || t('fields.namePlaceholder')}</h3>
                               <p className="text-muted-foreground flex items-center gap-1">
                                 <MapPin className="h-4 w-4" />
-                                {cityName || "Ciudad"}, {cantonName || "Cantón"}
+                                {cityName || t('fields.city')}, {cantonName || t('fields.canton')}
                               </p>
                             </div>
                           </div>
@@ -2057,7 +2060,7 @@ export default function RegistrarsePage() {
                           {is24h && (
                             <Badge className="mt-3 bg-green-500/10 text-green-500 border-green-500/30">
                               <Clock className="mr-1 h-3 w-3" />
-                              Disponible 24/7
+                              {tCommon('available24h')}
                             </Badge>
                           )}
 
@@ -2077,7 +2080,7 @@ export default function RegistrarsePage() {
                                   <div className="text-lg font-bold text-yellow-400">
                                     CHF {formData.basePrice}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">Precio base</div>
+                                  <div className="text-xs text-muted-foreground">{t('basePriceShort')}</div>
                                 </div>
                               )}
                               {formData.pricePerKm && (
@@ -2085,7 +2088,7 @@ export default function RegistrarsePage() {
                                   <div className="text-lg font-bold text-yellow-400">
                                     CHF {formData.pricePerKm}/km
                                   </div>
-                                  <div className="text-xs text-muted-foreground">Por kilómetro</div>
+                                  <div className="text-xs text-muted-foreground">{t('perKm')}</div>
                                 </div>
                               )}
                               {formData.hourlyRate && (
@@ -2093,7 +2096,7 @@ export default function RegistrarsePage() {
                                   <div className="text-lg font-bold text-yellow-400">
                                     CHF {formData.hourlyRate}/h
                                   </div>
-                                  <div className="text-xs text-muted-foreground">Tarifa hora</div>
+                                  <div className="text-xs text-muted-foreground">{t('hourlyRateShort')}</div>
                                 </div>
                               )}
                             </div>
@@ -2104,7 +2107,7 @@ export default function RegistrarsePage() {
                             <div className="mt-4">
                               <h4 className="font-medium mb-2 flex items-center gap-2">
                                 <Route className="h-4 w-4 text-yellow-400" />
-                                Rutas
+                                {t('routes')}
                               </h4>
                               <div className="flex flex-wrap gap-2">
                                 {routes.map((route, i) => (
@@ -2145,11 +2148,11 @@ export default function RegistrarsePage() {
                               className="mt-0.5"
                             />
                             <label htmlFor="terms" className="text-sm text-muted-foreground cursor-pointer">
-                              Acepto los{" "}
+                              {t('termsAccept')}{" "}
                               <Link href="/terminos" className="text-yellow-400 hover:underline" target="_blank">
-                                Términos de Servicio
+                                {t('termsOfService')}
                               </Link>{" "}
-                              y las condiciones de uso de la plataforma.
+                              {t('termsAndConditions')}
                             </label>
                           </div>
                           
@@ -2161,11 +2164,11 @@ export default function RegistrarsePage() {
                               className="mt-0.5"
                             />
                             <label htmlFor="privacy" className="text-sm text-muted-foreground cursor-pointer">
-                              Acepto la{" "}
+                              {t('privacyAccept')}{" "}
                               <Link href="/privacidad" className="text-yellow-400 hover:underline" target="_blank">
-                                Política de Privacidad
+                                {t('privacyPolicy')}
                               </Link>
-                              , incluyendo el tratamiento de mi ubicación en tiempo real cuando active el GPS para mostrar mi posición a clientes potenciales.
+                              {t('privacyDetails')}
                             </label>
                           </div>
                         </div>
@@ -2173,8 +2176,7 @@ export default function RegistrarsePage() {
                         <Separator className="my-3" />
                         
                         <p className="text-xs text-muted-foreground">
-                          Al crear tu perfil, tu información profesional será visible públicamente en la plataforma. 
-                          Puedes gestionar tu visibilidad desde tu panel de control en cualquier momento.
+                          {t('visibilityNote')}
                         </p>
                       </div>
                     </div>
@@ -2192,7 +2194,7 @@ export default function RegistrarsePage() {
                 disabled={currentStep === 1}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Anterior
+                {tCommon('back')}
               </Button>
 
               {currentStep < 8 ? (
@@ -2201,7 +2203,7 @@ export default function RegistrarsePage() {
                   className="bg-yellow-400 text-black hover:bg-yellow-500"
                   onClick={nextStep}
                 >
-                  Siguiente
+                  {tCommon('next')}
                   <Check className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
@@ -2214,12 +2216,12 @@ export default function RegistrarsePage() {
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creando perfil...
+                      {t('creatingProfile')}
                     </>
                   ) : (
                     <>
                       <Check className="mr-2 h-4 w-4" />
-                      Crear perfil
+                      {t('createProfile')}
                     </>
                   )}
                 </Button>

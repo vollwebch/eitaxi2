@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getClientSession } from '@/lib/client-auth'
+import { getClientServerSession } from '@/lib/client-auth'
 import { getServerSession } from '@/lib/auth'
 
 export async function GET() {
   try {
     // Check client auth
-    const clientSession = await getClientSession()
+    const clientSession = await getClientServerSession()
     const client = clientSession
       ? {
           clientId: clientSession.clientId,

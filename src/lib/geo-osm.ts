@@ -203,7 +203,7 @@ export async function geocodeAddress(
       addressdetails: addressdetails.toString(),
       limit: limit.toString(),
       countrycodes,
-      'accept-language': 'de,en'
+      'accept-language': 'en'
     });
 
     const url = `${NOMINATIM_BASE_URL}/search?${params}`;
@@ -230,13 +230,17 @@ export async function geocodeAddress(
       // Extraer ciudad (puede venir como city, town, village o municipality)
       const city = addr.city || addr.town || addr.village || addr.municipality || '';
       
-      // Extraer cantón/estado (county en Suiza es el cantón en algunos casos)
-      const canton = addr.state || addr.county || '';
-      
       // Extraer código de cantón del estado
+      const canton = addr.state || addr.county || '';
       let cantonCode = '';
-      if (addr.state) {
-        cantonCode = extractCantonCode(addr.state, addr.country_code || '');
+      if (canton) {
+        cantonCode = extractCantonCode(canton, addr.country_code || '');
+      }
+      
+      // Fallback: derivar cantón del código postal si no se pudo determinar
+      const postcode = addr.postcode || '';
+      if (!cantonCode && postcode && addr.country_code?.toUpperCase() === 'CH') {
+        cantonCode = cantonFromPostalCode(postcode);
       }
 
       // Bounding box
@@ -255,7 +259,7 @@ export async function geocodeAddress(
         lon: parseFloat(result.lon),
         display_name: result.display_name,
         city,
-        postalCode: addr.postcode || '',
+        postalCode: postcode,
         canton,
         cantonCode,
         country: addr.country || '',
@@ -301,7 +305,7 @@ export async function reverseGeocode(
       lon: lon.toString(),
       format: 'json',
       addressdetails: '1',
-      'accept-language': 'de,en'
+      'accept-language': 'en'
     });
 
     const url = `${NOMINATIM_BASE_URL}/reverse?${params}`;
@@ -319,14 +323,23 @@ export async function reverseGeocode(
 
     const addr = result.address || {};
     
+    const stateName = addr.state || addr.county || '';
+    const postcode = addr.postcode || '';
+    let cantonCode = extractCantonCode(stateName, addr.country_code || '');
+    
+    // Fallback: derivar cantón del código postal si no se pudo determinar por nombre
+    if (!cantonCode && postcode && addr.country_code?.toUpperCase() === 'CH') {
+      cantonCode = cantonFromPostalCode(postcode);
+    }
+    
     const location: GeocodedLocation = {
       lat: parseFloat(result.lat),
       lon: parseFloat(result.lon),
       display_name: result.display_name,
       city: addr.city || addr.town || addr.village || addr.municipality || '',
-      postalCode: addr.postcode || '',
-      canton: addr.state || addr.county || '',
-      cantonCode: extractCantonCode(addr.state || '', addr.country_code || ''),
+      postalCode: postcode,
+      canton: stateName,
+      cantonCode,
       country: addr.country || '',
       countryCode: addr.country_code?.toUpperCase() || '',
       type: 'address'
@@ -400,11 +413,124 @@ function extractCantonCode(stateName: string, countryCode: string): string {
     'geneva': 'GE',
     'ginebra': 'GE',
     'ginevra': 'GE',
-    'jura': 'JU'
+    'jura': 'JU',
+    // Nombres en español/italiano que Nominatim puede devolver
+    'san galo': 'SG',
+    'saint-gallen': 'SG',
+    'sant gallen': 'SG',
+    'argovia': 'AG',
+    'soleura': 'SO',
+    'bâle-ville': 'BS',
+    'bâle-campagne': 'BL',
+    'tifernas': 'GR',
+    'bellinzona': 'TI',
+    'cantón de zurich': 'ZH',
+    'cantón de zúrich': 'ZH',
+    'cantón de bern': 'BE',
+    'cantón de ginebra': 'GE',
+    'cantón de lucerna': 'LU',
+    'cantón de st. gallen': 'SG',
+    'cantón de san galo': 'SG',
+    'cantón de aargau': 'AG',
+    'canton de zurich': 'ZH',
+    'canton zurich': 'ZH',
+    'canton de zúrich': 'ZH',
+    'canton zürich': 'ZH',
+    'kanton zürich': 'ZH',
+    'canton de bern': 'BE',
+    'canton bern': 'BE',
+    'kanton bern': 'BE',
+    'canton de ginebra': 'GE',
+    'canton ginebra': 'GE',
+    'canton de genève': 'GE',
+    'canton geneva': 'GE',
+    'canton de st. gallen': 'SG',
+    'canton st. gallen': 'SG',
+    'canton de san galo': 'SG',
+    'canton san galo': 'SG',
+    'kanton st. gallen': 'SG',
+    'canton ticino': 'TI',
+    'canton de ticino': 'TI',
+    'canton de basel': 'BS',
+    'kanton basel-stadt': 'BS',
+    'kanton aargau': 'AG',
+    'canton de aargau': 'AG'
   };
 
   const normalized = stateName.toLowerCase().trim();
-  return cantonMap[normalized] || normalized.substring(0, 2).toUpperCase();
+  const mapped = cantonMap[normalized];
+  if (mapped) return mapped;
+  
+  // Fallback: extraer código del nombre si termina en 2 letras mayúsculas
+  const codeMatch = stateName.match(/\b([A-Z]{2})\b$/);
+  if (codeMatch) return codeMatch[1];
+  
+  return '';
+}
+
+/**
+ * Derivar código de cantón suizo a partir del código postal
+ * Los 2 primeros dígitos del código postal suizo identifican la región/cantón
+ */
+function cantonFromPostalCode(postalCode: string): string {
+  const prefix = postalCode.substring(0, 2);
+  
+  const postalToCanton: Record<string, string> = {
+    // Zürich (ZH)
+    '80': 'ZH', '81': 'ZH', '82': 'ZH', '83': 'ZH', '84': 'ZH', '85': 'ZH', '86': 'ZH', '87': 'ZH', '88': 'ZH', '89': 'ZH',
+    // Bern (BE)
+    '30': 'BE', '31': 'BE', '32': 'BE', '33': 'BE', '34': 'BE', '35': 'BE', '36': 'BE', '37': 'BE', '38': 'BE', '39': 'BE',
+    // Luzern (LU)
+    '60': 'LU', '61': 'LU', '62': 'LU', '63': 'LU', '64': 'LU',
+    // Uri (UR)
+    '64': 'UR',
+    // Schwyz (SZ)
+    '63': 'SZ', '64': 'SZ', '88': 'SZ',
+    // Obwalden (OW)
+    '60': 'OW',
+    // Nidwalden (NW)
+    '63': 'NW',
+    // Glarus (GL)
+    '87': 'GL', '88': 'GL',
+    // Zug (ZG)
+    '63': 'ZG',
+    // Fribourg (FR)
+    '17': 'FR', '16': 'FR', '18': 'FR',
+    // Solothurn (SO)
+    '45': 'SO', '46': 'SO', '47': 'SO',
+    // Basel-Stadt (BS)
+    '40': 'BS',
+    // Basel-Landschaft (BL)
+    '44': 'BL', '41': 'BL', '42': 'BL', '43': 'BL',
+    // Schaffhausen (SH)
+    '82': 'SH',
+    // Appenzell AR (AR)
+    '90': 'AR', '91': 'AR',
+    // Appenzell IR (AI)
+    '91': 'AI', '90': 'AI',
+    // St. Gallen (SG)
+    '73': 'SG', '82': 'SG', '83': 'SG', '84': 'SG', '88': 'SG', '90': 'SG', '91': 'SG', '93': 'SG', '94': 'SG', '95': 'SG', '96': 'SG',
+    // Graubünden (GR)
+    '70': 'GR', '71': 'GR', '72': 'GR', '73': 'GR', '74': 'GR', '75': 'GR', '76': 'GR', '77': 'GR', '78': 'GR', '79': 'GR',
+    // Aargau (AG)
+    '50': 'AG', '51': 'AG', '52': 'AG', '53': 'AG', '54': 'AG', '55': 'AG', '56': 'AG',
+    // Thurgau (TG)
+    '82': 'TG', '83': 'TG', '84': 'TG', '85': 'TG', '86': 'TG', '87': 'TG',
+    // Ticino (TI)
+    '65': 'TI', '66': 'TI', '67': 'TI', '68': 'TI', '69': 'TI',
+    // Vaud (VD)
+    '10': 'VD', '11': 'VD', '12': 'VD', '13': 'VD', '14': 'VD', '15': 'VD', '16': 'VD',
+    // Valais (VS)
+    '19': 'VS', '39': 'VS',
+    // Neuchâtel (NE)
+    '20': 'NE', '21': 'NE',
+    // Genève (GE)
+    '12': 'GE',
+    // Jura (JU)
+    '28': 'JU',
+  };
+  
+  return postalToCanton[prefix] || '';
 }
 
 // =========================================================================
