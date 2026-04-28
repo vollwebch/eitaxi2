@@ -1,7 +1,5 @@
 #!/bin/bash
 while true; do
-    cd /home/z/my-project/eitaxi-project/.next/standalone
-    node server.js >> /tmp/eitaxi-server.log 2>&1
-    echo "Server crashed at $(date), restarting in 2s..." >> /tmp/eitaxi-server.log
-    sleep 2
+  sleep 30
+  curl -s -o /dev/null http://localhost:3000/warmup || pm2 restart eitaxi 2>/dev/null
 done

@@ -24,7 +24,8 @@ export function SessionGuard({ children, redirectToDashboard = false }: SessionG
         .then(data => {
           setServerCheckDone(true);
           if (data.authenticated) {
-            router.replace(`/dashboard/${data.session.driverId}`);
+            const driverId = data.data?.driverId || data.session?.driverId;
+            router.replace(`/dashboard/${driverId}`);
           } else {
             // Server session invalid/expired - clear stale localStorage
             localStorage.removeItem('eitaxi_session');

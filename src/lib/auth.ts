@@ -98,7 +98,7 @@ export async function requireAuth(request?: Request): Promise<SessionPayload> {
 export const sessionCookieOptions = {
   name: SESSION_COOKIE_NAME,
   httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
+  secure: false,
   sameSite: 'strict' as const,
   maxAge: SESSION_MAX_AGE,
   path: '/',
