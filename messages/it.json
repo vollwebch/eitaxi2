@@ -924,6 +924,7 @@
       "title": "Notifiche",
       "new": "nuova/e",
       "clearAll": "Cancella tutto",
+      "markAllAsRead": "Tutto letto",
       "subtitle": "Le tue ultime notifiche",
       "empty": "Non hai notifiche",
       "viewDetail": "Vedi dettaglio →",

@@ -924,6 +924,7 @@
       "title": "Notifications",
       "new": "nouvelle(s)",
       "clearAll": "Tout effacer",
+      "markAllAsRead": "Tout lu",
       "subtitle": "Vos dernières notifications",
       "empty": "Vous n'avez pas de notifications",
       "viewDetail": "Voir le détail →",

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Bell, Loader2, MessageSquare, CalendarPlus, UserMinus, X, Trash2 } from "lucide-react";
+import { Bell, Loader2, MessageSquare, CalendarPlus, UserMinus, X, Trash2, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -57,6 +57,7 @@ export default function DriverNotificationsPanel() {
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [clearingAll, setClearingAll] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -103,6 +104,25 @@ export default function DriverNotificationsPanel() {
       console.error("Error deleting notification:", err);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    setMarkingAllRead(true);
+    try {
+      const res = await fetch("/api/driver/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true, isRead: true }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      }
+    } catch (err) {
+      console.error("Error marking all as read:", err);
+    } finally {
+      setMarkingAllRead(false);
     }
   };
 
@@ -176,20 +196,38 @@ export default function DriverNotificationsPanel() {
                 )}
               </div>
               {notifications.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAll}
-                  disabled={clearingAll}
-                  className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 px-2"
-                >
-                  {clearingAll ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5 mr-1" />
+                <div className="flex items-center gap-1">
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={markAllAsRead}
+                      disabled={markingAllRead}
+                      className="text-xs text-muted-foreground hover:text-green-400 hover:bg-green-400/10 h-7 px-2"
+                    >
+                      {markingAllRead ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                      ) : (
+                        <CheckCheck className="h-3.5 w-3.5 mr-1" />
+                      )}
+                      {tNotif('markAllAsRead')}
+                    </Button>
                   )}
-                  {tNotif('clearAll')}
-                </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAll}
+                    disabled={clearingAll}
+                    className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 px-2"
+                  >
+                    {clearingAll ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                    )}
+                    {tNotif('clearAll')}
+                  </Button>
+                </div>
               )}
             </SheetTitle>
             <SheetDescription className="text-muted-foreground">

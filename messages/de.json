@@ -924,6 +924,7 @@
       "title": "Benachrichtigungen",
       "new": "neue",
       "clearAll": "Alle löschen",
+      "markAllAsRead": "Gelesen",
       "subtitle": "Ihre neuesten Benachrichtigungen",
       "empty": "Sie haben keine Benachrichtigungen",
       "viewDetail": "Details anzeigen →",

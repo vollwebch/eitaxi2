@@ -26,12 +26,21 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH - Mark notification as read
+// PATCH - Mark notification as read (single) or mark all as read
 export async function PATCH(request: NextRequest) {
   try {
     const session = await requireAuth(request);
     const body = await request.json();
-    const { id, isRead } = body;
+    const { id, isRead, all } = body;
+
+    // Mark ALL notifications as read
+    if (all) {
+      const result = await db.driverNotification.updateMany({
+        where: { driverId: session.driverId, isRead: false },
+        data: { isRead: true },
+      });
+      return NextResponse.json({ success: true, updatedCount: result.count });
+    }
 
     if (!id || typeof id !== 'string') {
       return NextResponse.json(
