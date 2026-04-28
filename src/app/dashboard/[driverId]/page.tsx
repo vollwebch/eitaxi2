@@ -296,6 +296,7 @@ function DriverDashboardPage() {
   const [gpsReminderDismissed, setGpsReminderDismissed] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
   const [autoExpandBookingId, setAutoExpandBookingId] = useState<string | null>(null);
+  const [autoOpenDirectConvId, setAutoOpenDirectConvId] = useState<string | null>(null);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const handleOpenBooking = useCallback((bookingId: string) => {
@@ -305,6 +306,7 @@ function DriverDashboardPage() {
 
   const tabParam = searchParams.get('tab');
   const bookingParam = searchParams.get('booking');
+  const directParam = searchParams.get('direct');
 
   // Handle URL params from notification links
   useEffect(() => {
@@ -314,7 +316,10 @@ function DriverDashboardPage() {
     if (bookingParam) {
       setAutoExpandBookingId(bookingParam);
     }
-  }, [tabParam, bookingParam]);
+    if (directParam) {
+      setAutoOpenDirectConvId(directParam);
+    }
+  }, [tabParam, bookingParam, directParam]);
 
   // Polling del contador de mensajes sin leer (siempre activo)
   useEffect(() => {
@@ -1889,7 +1894,7 @@ function DriverDashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {driver && <DashboardChatTab driverId={driver.id} onOpenBooking={handleOpenBooking} onUnreadCountChange={setChatUnreadCount} autoOpenConvId={activeTab === "chat" ? autoExpandBookingId : null} />}
+                {driver && <DashboardChatTab driverId={driver.id} onOpenBooking={handleOpenBooking} onUnreadCountChange={setChatUnreadCount} autoOpenConvId={activeTab === "chat" ? (autoExpandBookingId || autoOpenDirectConvId) : null} />}
               </CardContent>
             </Card>
           </TabsContent>

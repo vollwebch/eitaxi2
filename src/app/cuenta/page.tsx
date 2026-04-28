@@ -55,6 +55,7 @@ export default function CuentaPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("bookings");
   const [autoExpandBookingId, setAutoExpandBookingId] = useState<string | null>(null);
   const [autoOpenChat, setAutoOpenChat] = useState(false);
+  const [autoOpenDirectConvId, setAutoOpenDirectConvId] = useState<string | null>(null);
 
   // Calcular total de mensajes no leídos
   const totalUnreadMessages = bookings.reduce((sum, b) => {
@@ -86,10 +87,14 @@ export default function CuentaPage() {
   const tabParam = searchParams.get('tab');
   const bookingParam = searchParams.get('booking');
   const chatParam = searchParams.get('chat');
+  const directParam = searchParams.get('direct');
 
   useEffect(() => {
     if (tabParam === 'reservas') {
       setActiveTab('bookings');
+    }
+    if (tabParam === 'chat') {
+      setActiveTab('chat');
     }
     if (bookingParam) {
       setAutoExpandBookingId(bookingParam);
@@ -97,7 +102,10 @@ export default function CuentaPage() {
     if (chatParam === 'open') {
       setAutoOpenChat(true);
     }
-  }, [tabParam, bookingParam, chatParam]);
+    if (directParam) {
+      setAutoOpenDirectConvId(directParam);
+    }
+  }, [tabParam, bookingParam, chatParam, directParam]);
 
   // Restore session from localStorage first (instant)
   useEffect(() => {
@@ -351,7 +359,7 @@ export default function CuentaPage() {
         {activeTab === "trash" && <ClientTrashTab />}
         {activeTab === "statistics" && <StatisticsTab />}
         {activeTab === "favorites" && <FavoritesTab />}
-        {activeTab === "chat" && <DirectChatTab />}
+        {activeTab === "chat" && <DirectChatTab autoOpenConvId={autoOpenDirectConvId} />}
         {activeTab === "addresses" && <AddressesTab />}
         {activeTab === "emergency" && <EmergencyTab />}
         {activeTab === "profile" && (

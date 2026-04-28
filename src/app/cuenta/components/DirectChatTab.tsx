@@ -53,7 +53,11 @@ function formatRelativeTime(dateStr: string | null, tTime: (key: string, params?
   return date.toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit" });
 }
 
-export default function DirectChatTab() {
+interface DirectChatTabProps {
+  autoOpenConvId?: string | null;
+}
+
+export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
   const t = useTranslations("client.directChat");
   const tChat = useTranslations('dashboard.chat');
   const tTime = useTranslations('client.timeAgo');
@@ -128,6 +132,17 @@ export default function DirectChatTab() {
       if (!isPolling) setLoadingMessages(false);
     }
   }, []);
+
+  // Auto-open conversation from notification link
+  useEffect(() => {
+    if (autoOpenConvId && conversations.length > 0) {
+      const found = conversations.find(c => c.id === autoOpenConvId);
+      if (found) {
+        setSelectedConversation(found);
+        setShowChat(true);
+      }
+    }
+  }, [autoOpenConvId, conversations]);
 
   // Fetch conversations on mount
   useEffect(() => {
