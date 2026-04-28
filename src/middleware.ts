@@ -29,6 +29,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/registrarse') ||
     pathname.startsWith('/registro') ||
     pathname.startsWith('/gps-quick') ||
+    pathname.startsWith('/upload') ||
     pathname.includes('.') // archivos estáticos (img, css, js, etc.)
   ) {
     return NextResponse.next();
@@ -93,6 +94,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|icons/|uploads/|manifest.json|manifest-client.json|sw.js|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|icons/|uploads/|manifest.json|manifest-client.json|sw.js|robots.txt|upload).*)',
   ],
 };
