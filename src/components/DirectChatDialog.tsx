@@ -53,6 +53,7 @@ export default function DirectChatDialog({
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const initialLoadDone = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [translations, setTranslations] = useState<Record<string, string>>({});
   const [translatingId, setTranslatingId] = useState<string | null>(null);
@@ -133,28 +134,39 @@ export default function DirectChatDialog({
     }
   };
 
-  const fetchMessages = useCallback(async () => {
+  const fetchMessages = useCallback(async (isPolling = false) => {
     if (!conversationId) return;
+    if (!isPolling) setLoading(true);
     try {
       const res = await fetch(`/api/direct-chat/${conversationId}/messages`);
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
-        setMessages(data.data);
+        if (isPolling) {
+          setMessages((prev) => {
+            if (prev.length === data.data.length && prev[prev.length - 1]?.id === data.data[data.data.length - 1]?.id) {
+              return prev;
+            }
+            return data.data;
+          });
+        } else {
+          setMessages(data.data);
+        }
       }
     } catch (err) {
       console.error("Error fetching messages:", err);
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
   }, [conversationId]);
 
   // Poll messages when conversation is ready
   useEffect(() => {
     if (conversationId) {
+      initialLoadDone.current = false;
       setLoading(true);
-      fetchMessages();
+      fetchMessages(false);
       setNewMessage("");
-      pollIntervalRef.current = setInterval(fetchMessages, 10000);
+      pollIntervalRef.current = setInterval(() => fetchMessages(true), 15000);
     }
 
     return () => {
@@ -167,10 +179,11 @@ export default function DirectChatDialog({
 
   // Auto-scroll to bottom
   useEffect(() => {
+    if (loading) return;
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, loading]);
+  }, [messages.length, loading]);
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !conversationId) return;

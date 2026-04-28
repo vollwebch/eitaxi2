@@ -64,6 +64,7 @@ export default function DirectChatTab() {
   const [newMessage, setNewMessage] = useState("");
   const [loadingConversations, setLoadingConversations] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const initialLoadDone = useRef(false);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -88,18 +89,28 @@ export default function DirectChatTab() {
     }
   }, []);
 
-  const fetchMessages = useCallback(async (conversationId: string) => {
-    setLoadingMessages(true);
+  const fetchMessages = useCallback(async (conversationId: string, isPolling = false) => {
+    if (!isPolling) setLoadingMessages(true);
     try {
       const res = await fetch(`/api/direct-chat/${conversationId}/messages`);
       const data = await res.json();
       if (data.success && Array.isArray(data.data)) {
-        setMessages(data.data);
+        if (isPolling) {
+          // Only update if new messages arrived (avoid unnecessary re-renders)
+          setMessages((prev) => {
+            if (prev.length === data.data.length && prev[prev.length - 1]?.id === data.data[data.data.length - 1]?.id) {
+              return prev;
+            }
+            return data.data;
+          });
+        } else {
+          setMessages(data.data);
+        }
       }
     } catch (err) {
       console.error("Error fetching messages:", err);
     } finally {
-      setLoadingMessages(false);
+      if (!isPolling) setLoadingMessages(false);
     }
   }, []);
 
@@ -113,12 +124,13 @@ export default function DirectChatTab() {
   // When a conversation is selected, fetch its messages and poll
   useEffect(() => {
     if (selectedConversation) {
-      fetchMessages(selectedConversation.id);
+      initialLoadDone.current = false;
+      fetchMessages(selectedConversation.id, false);
       setNewMessage("");
       setTranslations({});
       pollIntervalRef.current = setInterval(
-        () => fetchMessages(selectedConversation.id),
-        10000
+        () => fetchMessages(selectedConversation.id, true),
+        15000
       );
     }
 
@@ -130,10 +142,11 @@ export default function DirectChatTab() {
     };
   }, [selectedConversation, fetchMessages]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom only on initial load or new messages at bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loadingMessages]);
+    if (loadingMessages) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+  }, [messages.length, loadingMessages]);
 
   const translateMessage = async (msgId: string, text: string) => {
     if (translations[msgId]) {
