@@ -118,8 +118,6 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
             const newData = data.data;
             const hasNew = newData.length !== prev.length || prev[prev.length - 1]?.id !== newData[newData.length - 1]?.id;
             if (!hasNew) return prev;
-            // New messages detected - also mark notifications as read
-            markConvNotificationsRead(conversationId);
             return newData;
           });
         } else {
@@ -147,13 +145,15 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
   // Fetch conversations on mount
   useEffect(() => {
     fetchConversations();
-    const interval = setInterval(fetchConversations, 15000);
+    const interval = setInterval(fetchConversations, 20000);
     return () => clearInterval(interval);
   }, [fetchConversations]);
 
   // When a conversation is selected, fetch its messages and poll
+  const selectedConvIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (selectedConversation) {
+      selectedConvIdRef.current = selectedConversation.id;
       initialLoadDone.current = false;
       fetchMessages(selectedConversation.id, false);
       markConvNotificationsRead(selectedConversation.id);
@@ -161,7 +161,7 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
       setTranslations({});
       pollIntervalRef.current = setInterval(
         () => fetchMessages(selectedConversation.id, true),
-        15000
+        20000
       );
     }
 
@@ -172,6 +172,16 @@ export default function DirectChatTab({ autoOpenConvId }: DirectChatTabProps) {
       }
     };
   }, [selectedConversation, fetchMessages]);
+
+  // When messages count increases (new message arrived), dismiss notifications silently
+  const prevMsgCountRef = useRef(0);
+  useEffect(() => {
+    if (messages.length > prevMsgCountRef.current && prevMsgCountRef.current > 0 && selectedConvIdRef.current) {
+      // New message detected during polling - mark notifications as read in background
+      markConvNotificationsRead(selectedConvIdRef.current);
+    }
+    prevMsgCountRef.current = messages.length;
+  }, [messages.length]);
 
   // Auto-scroll to bottom only on initial load or new messages at bottom
   useEffect(() => {

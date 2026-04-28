@@ -107,7 +107,7 @@ export default function BookingChat({
       setNewMessage("");
 
       // Polling cada 15 segundos (invisible, sin spinner)
-      pollIntervalRef.current = setInterval(() => fetchMessages(true), 15000);
+      pollIntervalRef.current = setInterval(() => fetchMessages(true), 20000);
     }
 
     return () => {

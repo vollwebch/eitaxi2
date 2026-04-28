@@ -181,7 +181,7 @@ export default function DirectChatDialog({
       fetchMessages(false);
       markConvNotificationsRead();
       setNewMessage("");
-      pollIntervalRef.current = setInterval(() => fetchMessages(true), 15000);
+      pollIntervalRef.current = setInterval(() => fetchMessages(true), 20000);
     }
 
     return () => {
